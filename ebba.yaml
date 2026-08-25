@@ -14,8 +14,9 @@ jobs:
 - name: ebba
   active: true
   path: ~/dev/ebba
-  build: ~/.cargo/bin/cargo build --release
+  build: 
+    - ~/.cargo/bin/cargo build --release
+    - ~/.cargo/bin/cargo install --path .
   post-build:
-    - test -f target/release/ebba && cp -f target/release/ebba ~/.local/bin/
     - which gb && gb -I ebba.yaml -a -w
   interval: 3600
