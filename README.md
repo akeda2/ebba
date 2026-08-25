@@ -1,6 +1,6 @@
 # ebba
 
-`ebba` is a **minimal terminal editor MVP** for text/binary file workflows.  
+`ebba` is a **minimal terminal editor** for text/binary file workflows.  
 Current scope is Linux-first and intentionally small.
 
 ## MVP scope and constraints
@@ -100,8 +100,6 @@ keybindings:
   quit: "Ctrl+Q"
 ```
 
-## License and attribution
+## License
 
 This project is licensed under **GPL-2.0-only** (`LICENSE`, SPDX: `GPL-2.0-only`).
-
-MVP attribution note: ebba is an adaptation effort inspired by Fresh editor ideas; this note is attribution only and does not imply upstream endorsement.
