@@ -111,7 +111,6 @@ pub fn command_from_key_event(key_event: KeyEvent) -> Option<Command> {
         KeyCode::Enter => Some(Command::NewLine),
         KeyCode::Backspace => Some(Command::Backspace),
         KeyCode::Delete => Some(Command::Delete),
-        KeyCode::Esc => Some(Command::ForceQuit),
         KeyCode::F(10) => Some(Command::Quit),
         KeyCode::F(12) => Some(Command::ForceQuit),
         KeyCode::Left if ctrl => Some(Command::Move {

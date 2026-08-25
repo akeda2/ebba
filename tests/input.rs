@@ -58,9 +58,9 @@ fn maps_ctrl_q_control_character_form_to_quit() {
 }
 
 #[test]
-fn maps_escape_to_force_quit() {
+fn esc_is_not_bound_to_force_quit() {
     let key = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
-    assert_eq!(command_from_key_event(key), Some(Command::ForceQuit));
+    assert_eq!(command_from_key_event(key), None);
 }
 
 #[test]
