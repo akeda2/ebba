@@ -432,7 +432,7 @@ pub fn run() -> AppResult<()> {
         ))
     } else {
         Some(String::from(
-            "Ctrl+Q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • Ctrl+T tab • Ctrl+W wrap • Ctrl+K invisibles • PRESERVE = keep existing line endings",
+            "Ctrl+Q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • Ctrl+T tab • Ctrl+W wrap • Ctrl+K/Alt+I invisibles • PRESERVE = keep existing line endings",
         ))
     };
     let mut needs_render = true;

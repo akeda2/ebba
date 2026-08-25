@@ -83,6 +83,12 @@ fn maps_ctrl_g_to_force_quit() {
 }
 
 #[test]
+fn maps_alt_i_to_toggle_invisibles() {
+    let key = KeyEvent::new(KeyCode::Char('i'), KeyModifiers::ALT);
+    assert_eq!(command_from_key_event(key), Some(Command::ToggleInvisibles));
+}
+
+#[test]
 fn maps_shift_arrow_to_extending_selection_move() {
     let key = KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT);
     assert_eq!(

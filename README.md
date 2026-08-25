@@ -49,7 +49,7 @@ Current input mapping includes:
 - `Ctrl+Q`, `Alt+Q`, or `F10` quit
 - `Ctrl+Alt+Q`, `Alt+Shift+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, or `F12` force-quit
 - `Ctrl+W` toggle line wrap on/off
-- `Ctrl+K` toggle invisible characters on/off
+- `Ctrl+K` or `Alt+I` toggle invisible characters on/off
 - `Ctrl+C` copy, `Ctrl+X` cut, `Ctrl+V` paste, `Ctrl+A` select-all
 - `Ctrl+Z` undo, `Ctrl+Y` / `Ctrl+Shift+Z` redo
 

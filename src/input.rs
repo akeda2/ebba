@@ -106,6 +106,8 @@ pub fn command_from_key_event(key_event: KeyEvent) -> Option<Command> {
         KeyCode::Char('q') if alt && shift => Some(Command::ForceQuit),
         KeyCode::Char('q') if alt => Some(Command::Quit),
         KeyCode::Char('Q') if alt => Some(Command::ForceQuit),
+        KeyCode::Char('i') if alt => Some(Command::ToggleInvisibles),
+        KeyCode::Char('I') if alt => Some(Command::ToggleInvisibles),
         KeyCode::Char(ch) if !alt => Some(Command::InsertChar(ch)),
         KeyCode::Tab => Some(Command::InsertChar('\t')),
         KeyCode::BackTab => Some(Command::OutdentSelection),
