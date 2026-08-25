@@ -428,11 +428,11 @@ pub fn run() -> AppResult<()> {
     let mut flusher = WriterFlush::new(stdout());
     let mut status_message = if app_state.is_hex_mode() {
         Some(String::from(
-            "q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • ↑/↓/PgUp/PgDn/Home/End scroll",
+            "q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • ↑/↓/PgUp/PgDn/Home/End scroll • PRESERVE = keep existing line endings",
         ))
     } else {
         Some(String::from(
-            "Ctrl+Q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • Ctrl+T tab • Ctrl+W wrap • Ctrl+K invisibles",
+            "Ctrl+Q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • Ctrl+T tab • Ctrl+W wrap • Ctrl+K invisibles • PRESERVE = keep existing line endings",
         ))
     };
     let mut needs_render = true;
