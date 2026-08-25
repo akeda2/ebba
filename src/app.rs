@@ -35,6 +35,7 @@ pub struct AppState {
     hex_mode: bool,
     tab_width: usize,
     viewport_rows: usize,
+    wrap_enabled: bool,
 }
 
 impl AppState {
@@ -50,6 +51,7 @@ impl AppState {
             hex_mode: false,
             tab_width: 2,
             viewport_rows: 20,
+            wrap_enabled: false,
         }
     }
 
@@ -71,6 +73,14 @@ impl AppState {
 
     pub fn is_hex_mode(&self) -> bool {
         self.hex_mode
+    }
+
+    pub fn is_wrap_enabled(&self) -> bool {
+        self.wrap_enabled
+    }
+
+    pub fn set_wrap_enabled(&mut self, enabled: bool) {
+        self.wrap_enabled = enabled;
     }
 
     pub fn set_viewport_rows(&mut self, rows: usize) {
@@ -126,6 +136,10 @@ impl AppState {
                     4 => 8,
                     _ => 2,
                 };
+                Ok(CommandDisposition::Continue)
+            }
+            Command::ToggleWrap => {
+                self.wrap_enabled = !self.wrap_enabled;
                 Ok(CommandDisposition::Continue)
             }
             Command::OutdentSelection => {
@@ -366,6 +380,7 @@ pub fn run() -> AppResult<()> {
     );
     app_state.set_hex_mode(hex_mode);
     app_state.set_read_only(read_only);
+    app_state.set_wrap_enabled(args.wrap);
 
     let mut terminal = Terminal::new()?;
     let _terminal_modes = TerminalModeGuard::enter()?;
@@ -378,7 +393,9 @@ pub fn run() -> AppResult<()> {
             "q quit • Esc force quit • ↑/↓/PgUp/PgDn/Home/End scroll",
         ))
     } else {
-        Some(String::from("Ctrl+Q quit • Ctrl+Alt+Q force quit • Ctrl+T tab width"))
+        Some(String::from(
+            "Ctrl+Q quit • Ctrl+Alt+Q force quit • Ctrl+T tab width • Ctrl+W wrap",
+        ))
     };
     let mut needs_render = true;
 
@@ -411,6 +428,7 @@ pub fn run() -> AppResult<()> {
                     })
                     .map(str::to_string)
                     .unwrap_or_else(|| "PRESERVE".to_string()),
+                wrap_enabled: app_state.is_wrap_enabled(),
                 message: status_message.clone(),
                 ..StatusLine::default()
             };
@@ -433,6 +451,7 @@ pub fn run() -> AppResult<()> {
                     RenderRequest {
                         mode: RenderMode::Text {
                             document: app_state.document(),
+                            wrap: app_state.is_wrap_enabled(),
                         },
                         status,
                     },
@@ -472,11 +491,15 @@ pub fn run() -> AppResult<()> {
                 continue;
             }
             let was_cycle_tab = matches!(command, Command::CycleTabWidth);
+            let was_toggle_wrap = matches!(command, Command::ToggleWrap);
             match app_state.execute_command(command) {
                 Ok(CommandDisposition::Exit) => return Ok(()),
                 Ok(CommandDisposition::Continue) => {
                     if was_cycle_tab {
                         status_message = Some(format!("Tab width: {}", app_state.tab_width()));
+                    } else if was_toggle_wrap {
+                        let mode = if app_state.is_wrap_enabled() { "on" } else { "off" };
+                        status_message = Some(format!("Wrap: {mode}"));
                     } else {
                         status_message = None;
                     }
@@ -576,6 +599,16 @@ mod tests {
             app.document().bytes().expect("bytes should be readable"),
             b"    "
         );
+    }
+
+    #[test]
+    fn toggle_wrap_flips_runtime_wrap_state() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        assert!(!app.is_wrap_enabled());
+        app.execute_command(Command::ToggleWrap)
+            .expect("toggle wrap should succeed");
+        assert!(app.is_wrap_enabled());
     }
 
     #[test]

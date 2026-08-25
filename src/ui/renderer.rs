@@ -9,7 +9,7 @@ const STATUS_ROWS: usize = 1;
 
 #[derive(Debug, Clone, Copy)]
 pub enum RenderMode<'a> {
-    Text { document: &'a Document },
+    Text { document: &'a Document, wrap: bool },
     Hex { bytes: &'a [u8] },
 }
 
@@ -119,8 +119,8 @@ impl Renderer {
         let mut status = request.status;
 
         match request.mode {
-            RenderMode::Text { document } => {
-                let mut text = self.render_text(state, document, body_width, body_height);
+            RenderMode::Text { document, wrap } => {
+                let mut text = self.render_text(state, document, body_width, body_height, wrap);
                 status = status.with_position(
                     text.cursor_line + 1,
                     text.cursor_column + 1,
@@ -154,14 +154,16 @@ impl Renderer {
         document: &Document,
         body_width: usize,
         body_height: usize,
+        wrap: bool,
     ) -> TextRenderOutput {
         let previous_scroll = state.scroll_row;
         let mut rendered = TextView::render(
             document,
             TextViewport {
-                first_line: state.scroll_row,
+                first_row: state.scroll_row,
                 width: body_width,
                 height: body_height,
+                wrap,
             },
         );
         state.ensure_cursor_visible(rendered.cursor_line, rendered.total_lines);
@@ -169,9 +171,10 @@ impl Renderer {
             rendered = TextView::render(
                 document,
                 TextViewport {
-                    first_line: state.scroll_row,
+                    first_row: state.scroll_row,
                     width: body_width,
                     height: body_height,
+                    wrap,
                 },
             );
         }

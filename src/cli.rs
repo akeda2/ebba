@@ -25,6 +25,8 @@ pub struct Cli {
     #[arg(long, conflicts_with = "text")]
     pub binary: bool,
     #[arg(long)]
+    pub wrap: bool,
+    #[arg(long)]
     pub config: Option<PathBuf>,
 }
 

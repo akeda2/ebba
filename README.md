@@ -13,7 +13,7 @@ Current scope is Linux-first and intentionally small.
 ## Run
 
 ```bash
-cargo run -- [FILE] [--encoding ENCODING] [--line-ending <lf|crlf>] [--text|--binary] [--config PATH]
+cargo run -- [FILE] [--encoding ENCODING] [--line-ending <lf|crlf>] [--text|--binary] [--wrap] [--config PATH]
 ```
 
 `--text` and `--binary` are mutually exclusive.
@@ -30,6 +30,8 @@ cargo run -- [FILE] [--encoding ENCODING] [--line-ending <lf|crlf>] [--text|--bi
   Force hex read-only startup mode.
 - `--config PATH`  
   Load YAML config from an explicit path.
+- `--wrap`  
+  Enable line wrapping at startup (default is off).
 
 ## Rendering behavior in MVP
 
@@ -43,6 +45,7 @@ Current input mapping includes:
 - `Ctrl+S` save
 - `Ctrl+Q` quit
 - `Ctrl+Alt+Q` or `Ctrl+Shift+Q` force-quit
+- `Ctrl+W` toggle line wrap on/off
 - `Ctrl+C` copy, `Ctrl+X` cut, `Ctrl+V` paste, `Ctrl+A` select-all
 - `Ctrl+Z` undo, `Ctrl+Y` / `Ctrl+Shift+Z` redo
 

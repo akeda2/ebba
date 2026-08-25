@@ -6,9 +6,10 @@ pub const MIN_GUTTER_WIDTH: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextViewport {
-    pub first_line: usize,
+    pub first_row: usize,
     pub width: usize,
     pub height: usize,
+    pub wrap: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,72 +38,194 @@ struct LineRange {
     end_with_newline: usize,
 }
 
+#[derive(Debug, Clone)]
+struct WrappedSegment {
+    text: String,
+    start_column: usize,
+    end_column: usize,
+}
+
 impl TextView {
     pub fn render(document: &Document, viewport: TextViewport) -> TextRenderOutput {
-        let bytes = document.bytes().unwrap_or_default();
-        let ranges = line_ranges(&bytes);
-        let total_lines = ranges.len();
-        let selection = document.selection();
-        let cursor_offset = selection.active.byte_offset.min(bytes.len());
-        let (cursor_line, cursor_column) = offset_to_line_column(&ranges, &bytes, cursor_offset);
-        let selection_start = selection.start().min(bytes.len());
-        let selection_end = selection.end().min(bytes.len());
-        let gutter_width = gutter_width(total_lines);
-        let text_width = viewport.width.saturating_sub(gutter_width + 1);
-        let first_line = viewport
-            .first_line
-            .min(total_lines.saturating_sub(1))
-            .min(total_lines);
+        if viewport.wrap {
+            render_wrapped(document, viewport)
+        } else {
+            render_unwrapped(document, viewport)
+        }
+    }
+}
 
-        let mut lines = Vec::with_capacity(viewport.height);
-        let mut selection_spans = Vec::with_capacity(viewport.height);
-        let mut cursor = None;
+fn render_unwrapped(document: &Document, viewport: TextViewport) -> TextRenderOutput {
+    let bytes = document.bytes().unwrap_or_default();
+    let ranges = line_ranges(&bytes);
+    let total_lines = ranges.len();
+    let selection = document.selection();
+    let cursor_offset = selection.active.byte_offset.min(bytes.len());
+    let (cursor_line, cursor_column) = offset_to_line_column(&ranges, &bytes, cursor_offset);
+    let selection_start = selection.start().min(bytes.len());
+    let selection_end = selection.end().min(bytes.len());
+    let gutter_width = gutter_width(total_lines);
+    let text_width = viewport.width.saturating_sub(gutter_width + 1);
+    let first_line = viewport
+        .first_row
+        .min(total_lines.saturating_sub(1))
+        .min(total_lines);
 
-        for row in 0..viewport.height {
-            let line_index = first_line + row;
-            if line_index >= total_lines {
-                let filler = fit_to_width(
-                    &format!("{:>width$} ~", "", width = gutter_width),
-                    viewport.width,
-                );
-                lines.push(filler);
-                selection_spans.push(None);
-                continue;
-            }
+    let mut lines = Vec::with_capacity(viewport.height);
+    let mut selection_spans = Vec::with_capacity(viewport.height);
+    let mut cursor = None;
 
-            let range = ranges[line_index];
-            let content = String::from_utf8_lossy(&bytes[range.start..range.end_no_newline]);
-            let line_selection = selection_span_for_line(range, &bytes, selection_start, selection_end);
-            let decorated_text = render_text_with_selection(content.as_ref(), text_width, line_selection);
-            let rendered = format!(
-                "{:>gutter_width$} {}",
-                line_index + 1,
-                decorated_text,
-                gutter_width = gutter_width
+    for row in 0..viewport.height {
+        let line_index = first_line + row;
+        if line_index >= total_lines {
+            let filler = fit_to_width(
+                &format!("{:>width$} ~", "", width = gutter_width),
+                viewport.width,
             );
-            lines.push(rendered);
+            lines.push(filler);
+            selection_spans.push(None);
+            continue;
+        }
 
+        let range = ranges[line_index];
+        let content = String::from_utf8_lossy(&bytes[range.start..range.end_no_newline]);
+        let line_selection = selection_span_for_line(range, &bytes, selection_start, selection_end);
+        let decorated_text = render_text_with_selection(content.as_ref(), text_width, line_selection);
+        let rendered = format!(
+            "{:>gutter_width$} {}",
+            line_index + 1,
+            decorated_text,
+            gutter_width = gutter_width
+        );
+        lines.push(rendered);
+
+        if line_index == cursor_line {
+            let max_cursor_col = text_width.saturating_sub(1);
+            let visual_col = if text_width == 0 {
+                0
+            } else {
+                cursor_column.min(max_cursor_col)
+            };
+            cursor = Some((row, gutter_width + 1 + visual_col));
+        }
+
+        selection_spans.push(line_selection);
+    }
+
+    TextRenderOutput {
+        lines,
+        cursor,
+        cursor_line,
+        cursor_column,
+        total_lines,
+        selection_spans,
+    }
+}
+
+fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutput {
+    let bytes = document.bytes().unwrap_or_default();
+    let ranges = line_ranges(&bytes);
+    let total_lines = ranges.len();
+    let selection = document.selection();
+    let cursor_offset = selection.active.byte_offset.min(bytes.len());
+    let (cursor_line, cursor_column) = offset_to_line_column(&ranges, &bytes, cursor_offset);
+    let selection_start = selection.start().min(bytes.len());
+    let selection_end = selection.end().min(bytes.len());
+    let gutter_width = gutter_width(total_lines);
+    let text_width = viewport.width.saturating_sub(gutter_width + 1).max(1);
+
+    let mut visual_rows: Vec<(usize, bool, String)> = Vec::new();
+    let mut cursor_visual_row = 0usize;
+    let mut cursor_col = gutter_width + 1;
+    let mut visual_index = 0usize;
+
+    for (line_index, range) in ranges.iter().copied().enumerate() {
+        let content = String::from_utf8_lossy(&bytes[range.start..range.end_no_newline]).to_string();
+        let segments = wrap_segments(&content, text_width);
+        let line_selection = selection_span_for_line(range, &bytes, selection_start, selection_end);
+        let last_segment = segments.len().saturating_sub(1);
+
+        for (segment_index, segment) in segments.iter().enumerate() {
             if line_index == cursor_line {
-                let max_cursor_col = text_width.saturating_sub(1);
-                let visual_col = if text_width == 0 {
-                    0
-                } else {
-                    cursor_column.min(max_cursor_col)
-                };
-                cursor = Some((row, gutter_width + 1 + visual_col));
+                let is_target = cursor_column < segment.end_column || segment_index == last_segment;
+                if is_target {
+                    cursor_visual_row = visual_index;
+                    let segment_width = segment.end_column.saturating_sub(segment.start_column);
+                    let relative = cursor_column
+                        .saturating_sub(segment.start_column)
+                        .min(segment_width);
+                    cursor_col = gutter_width + 1 + relative;
+                }
             }
 
-            selection_spans.push(line_selection);
+            let selection = line_selection.and_then(|sel| {
+                let start = sel.start_column.max(segment.start_column);
+                let end = sel.end_column.min(segment.end_column);
+                if start >= end {
+                    return None;
+                }
+                Some(SelectionSpan {
+                    start_column: start - segment.start_column,
+                    end_column: end - segment.start_column,
+                })
+            });
+
+            visual_rows.push((
+                line_index,
+                segment_index == 0,
+                render_text_with_selection(&segment.text, text_width, selection),
+            ));
+            visual_index += 1;
+        }
+    }
+
+    if visual_rows.is_empty() {
+        visual_rows.push((0, true, " ".repeat(text_width)));
+    }
+
+    let total_rows = visual_rows.len();
+    let first_row = viewport
+        .first_row
+        .min(total_rows.saturating_sub(1))
+        .min(total_rows);
+
+    let mut lines = Vec::with_capacity(viewport.height);
+    let mut selection_spans = Vec::with_capacity(viewport.height);
+    let mut cursor = None;
+
+    for row in 0..viewport.height {
+        let visual_row = first_row + row;
+        if visual_row >= total_rows {
+            let filler = fit_to_width(
+                &format!("{:>width$} ~", "", width = gutter_width),
+                viewport.width,
+            );
+            lines.push(filler);
+            selection_spans.push(None);
+            continue;
         }
 
-        TextRenderOutput {
-            lines,
-            cursor,
-            cursor_line,
-            cursor_column,
-            total_lines,
-            selection_spans,
+        let (line_index, show_number, text) = &visual_rows[visual_row];
+        let gutter = if *show_number {
+            format!("{:>gutter_width$}", line_index + 1, gutter_width = gutter_width)
+        } else {
+            " ".repeat(gutter_width)
+        };
+        lines.push(format!("{gutter} {text}"));
+        selection_spans.push(None);
+
+        if visual_row == cursor_visual_row {
+            cursor = Some((row, cursor_col));
         }
+    }
+
+    TextRenderOutput {
+        lines,
+        cursor,
+        cursor_line: cursor_visual_row,
+        cursor_column: cursor_col.saturating_sub(gutter_width + 1),
+        total_lines: total_rows,
+        selection_spans,
     }
 }
 
@@ -257,9 +380,53 @@ fn render_text_with_selection(
     out
 }
 
+fn wrap_segments(content: &str, width: usize) -> Vec<WrappedSegment> {
+    if content.is_empty() {
+        return vec![WrappedSegment {
+            text: String::new(),
+            start_column: 0,
+            end_column: 0,
+        }];
+    }
+
+    let mut segments = Vec::new();
+    let mut segment = String::new();
+    let mut segment_start = 0usize;
+    let mut segment_width = 0usize;
+    let mut total_width = 0usize;
+
+    for ch in content.chars() {
+        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if segment_width > 0 && segment_width + ch_width > width {
+            segments.push(WrappedSegment {
+                text: segment,
+                start_column: segment_start,
+                end_column: total_width,
+            });
+            segment = String::new();
+            segment_start = total_width;
+            segment_width = 0;
+        }
+
+        segment.push(ch);
+        segment_width += ch_width;
+        total_width += ch_width;
+    }
+
+    segments.push(WrappedSegment {
+        text: segment,
+        start_column: segment_start,
+        end_column: total_width,
+    });
+
+    segments
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{line_ranges, offset_to_line_column};
+    use crate::document::Document;
+
+    use super::{TextView, TextViewport, line_ranges, offset_to_line_column};
 
     #[test]
     fn offset_at_next_line_start_maps_to_next_line() {
@@ -268,5 +435,22 @@ mod tests {
 
         assert_eq!(offset_to_line_column(&ranges, bytes, 4), (1, 0));
         assert_eq!(offset_to_line_column(&ranges, bytes, 5), (2, 0));
+    }
+
+    #[test]
+    fn wraps_single_line_into_visual_rows() {
+        let doc = Document::from_bytes(b"abcdef".to_vec());
+        let rendered = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 9,
+                height: 2,
+                wrap: true,
+            },
+        );
+        assert!(rendered.lines[0].contains("abcd"));
+        assert!(rendered.lines[1].contains("ef"));
+        assert!(rendered.lines[1].starts_with("     "));
     }
 }

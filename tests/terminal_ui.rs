@@ -7,7 +7,7 @@ use ebba::ui::text_view::{TextView, TextViewport};
 #[test]
 fn status_line_is_rendered_on_top_row() {
     let doc = Document::from_bytes(b"alpha\nbeta".to_vec());
-    let mut state = RenderState::new(50, 4);
+    let mut state = RenderState::new(80, 4);
     let status = StatusLine {
         filename: "notes.txt".to_string(),
         message: Some("saved".to_string()),
@@ -16,7 +16,10 @@ fn status_line_is_rendered_on_top_row() {
     let frame = Renderer.render(
         &mut state,
         RenderRequest {
-            mode: RenderMode::Text { document: &doc },
+            mode: RenderMode::Text {
+                document: &doc,
+                wrap: false,
+            },
             status,
         },
     );
@@ -32,9 +35,10 @@ fn text_mode_always_includes_line_number_gutter() {
     let rendered = TextView::render(
         &doc,
         TextViewport {
-            first_line: 0,
+            first_row: 0,
             width: 20,
             height: 1,
+            wrap: false,
         },
     );
     assert!(rendered.lines[0].starts_with("   1 "));
@@ -46,9 +50,10 @@ fn viewport_clips_rows_based_on_scroll() {
     let rendered = TextView::render(
         &doc,
         TextViewport {
-            first_line: 2,
+            first_row: 2,
             width: 20,
             height: 2,
+            wrap: false,
         },
     );
 
@@ -102,7 +107,10 @@ fn renderer_keeps_status_line_when_body_height_is_zero() {
     let frame = Renderer.render(
         &mut state,
         RenderRequest {
-            mode: RenderMode::Text { document: &doc },
+            mode: RenderMode::Text {
+                document: &doc,
+                wrap: false,
+            },
             status: StatusLine {
                 filename: "tiny.txt".to_string(),
                 ..StatusLine::default()
@@ -121,9 +129,10 @@ fn gutter_width_scales_with_total_line_count() {
     let rendered = TextView::render(
         &doc,
         TextViewport {
-            first_line: 118,
+            first_row: 118,
             width: 20,
             height: 1,
+            wrap: false,
         },
     );
 
@@ -144,9 +153,10 @@ fn text_view_renders_utf8_file_content() {
     let rendered = TextView::render(
         &doc,
         TextViewport {
-            first_line: 0,
+            first_row: 0,
             width: 40,
             height: 2,
+            wrap: false,
         },
     );
 
@@ -161,7 +171,10 @@ fn renderer_places_cursor_on_first_text_row_not_status_row() {
     let frame = Renderer.render(
         &mut state,
         RenderRequest {
-            mode: RenderMode::Text { document: &doc },
+            mode: RenderMode::Text {
+                document: &doc,
+                wrap: false,
+            },
             status: StatusLine::default(),
         },
     );
@@ -176,9 +189,10 @@ fn selection_is_visually_highlighted() {
     let rendered = TextView::render(
         &doc,
         TextViewport {
-            first_line: 0,
+            first_row: 0,
             width: 30,
             height: 1,
+            wrap: false,
         },
     );
 
