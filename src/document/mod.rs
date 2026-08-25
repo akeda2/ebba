@@ -234,6 +234,30 @@ impl Document {
         Ok(())
     }
 
+    pub fn move_page_up(&mut self, lines: usize, extend: bool) -> Result<(), DocumentError> {
+        let steps = lines.max(1);
+        for _ in 0..steps {
+            let before = self.selection.active.byte_offset;
+            self.move_up(extend)?;
+            if self.selection.active.byte_offset == before {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn move_page_down(&mut self, lines: usize, extend: bool) -> Result<(), DocumentError> {
+        let steps = lines.max(1);
+        for _ in 0..steps {
+            let before = self.selection.active.byte_offset;
+            self.move_down(extend)?;
+            if self.selection.active.byte_offset == before {
+                break;
+            }
+        }
+        Ok(())
+    }
+
     pub fn move_line_start(&mut self, extend: bool) -> Result<(), DocumentError> {
         self.history.flush_pending();
         self.preferred_column = None;

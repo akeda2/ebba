@@ -181,3 +181,24 @@ fn outdent_then_indent_does_not_spill_to_next_line_when_selection_ends_on_line_b
     assert!(doc.indent_selection_lines(2).unwrap());
     assert_eq!(doc.bytes().unwrap(), b"  a\n  b\nc");
 }
+
+#[test]
+fn page_movement_moves_more_than_single_line() {
+    let content = (0..30)
+        .map(|i| format!("line{i}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .into_bytes();
+
+    let mut single = Document::from_bytes(content.clone());
+    single.move_down(false).unwrap();
+    let one_line_offset = single.selection().active.byte_offset;
+
+    let mut page = Document::from_bytes(content);
+    page.move_page_down(8, false).unwrap();
+    let page_offset = page.selection().active.byte_offset;
+    assert!(page_offset > one_line_offset);
+
+    page.move_page_up(8, false).unwrap();
+    assert_eq!(page.selection().active.byte_offset, 0);
+}

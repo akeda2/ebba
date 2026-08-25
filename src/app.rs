@@ -34,6 +34,7 @@ pub struct AppState {
     read_only: bool,
     hex_mode: bool,
     tab_width: usize,
+    viewport_rows: usize,
 }
 
 impl AppState {
@@ -48,6 +49,7 @@ impl AppState {
             read_only: false,
             hex_mode: false,
             tab_width: 2,
+            viewport_rows: 20,
         }
     }
 
@@ -65,6 +67,10 @@ impl AppState {
 
     pub fn tab_width(&self) -> usize {
         self.tab_width
+    }
+
+    pub fn set_viewport_rows(&mut self, rows: usize) {
+        self.viewport_rows = rows.max(1);
     }
 
     pub fn execute_command(&mut self, command: Command) -> AppResult<CommandDisposition> {
@@ -209,13 +215,21 @@ impl AppState {
                         .document
                         .move_right(extend)
                         .map_err(|error| AppError::Message(error.to_string()))?,
-                    MoveCommand::Up | MoveCommand::PageUp => self
+                    MoveCommand::Up => self
                         .document
                         .move_up(extend)
                         .map_err(|error| AppError::Message(error.to_string()))?,
-                    MoveCommand::Down | MoveCommand::PageDown => self
+                    MoveCommand::Down => self
                         .document
                         .move_down(extend)
+                        .map_err(|error| AppError::Message(error.to_string()))?,
+                    MoveCommand::PageUp => self
+                        .document
+                        .move_page_up(self.viewport_rows, extend)
+                        .map_err(|error| AppError::Message(error.to_string()))?,
+                    MoveCommand::PageDown => self
+                        .document
+                        .move_page_down(self.viewport_rows, extend)
                         .map_err(|error| AppError::Message(error.to_string()))?,
                     MoveCommand::LineStart => self
                         .document
@@ -398,6 +412,7 @@ pub fn run() -> AppResult<()> {
             continue;
         }
 
+        app_state.set_viewport_rows(render_state.body_height().max(1));
         for command in commands {
             let was_cycle_tab = matches!(command, Command::CycleTabWidth);
             match app_state.execute_command(command) {
@@ -424,7 +439,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use crate::command::Command;
+    use crate::command::{Command, MoveCommand};
     use crate::document::Document;
 
     use super::{AppState, CommandDisposition};
@@ -522,5 +537,33 @@ mod tests {
         app.execute_command(Command::OutdentSelection)
             .expect("outdent should succeed");
         assert_eq!(app.document().bytes().expect("bytes should be readable"), b"a\nb");
+    }
+
+    #[test]
+    fn page_down_uses_viewport_height() {
+        let content = (0..30)
+            .map(|i| format!("line{i}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into_bytes();
+        let mut app = AppState::new(Document::from_bytes(content.clone()));
+        app.set_viewport_rows(6);
+        app.execute_command(Command::Move {
+            direction: MoveCommand::PageDown,
+            extend: false,
+        })
+        .expect("page down should succeed");
+        let page_offset = app.document().selection().active.byte_offset;
+
+        let mut one_line = AppState::new(Document::from_bytes(content));
+        one_line
+            .execute_command(Command::Move {
+                direction: MoveCommand::Down,
+                extend: false,
+            })
+            .expect("line down should succeed");
+        let line_offset = one_line.document().selection().active.byte_offset;
+
+        assert!(page_offset > line_offset);
     }
 }
