@@ -1,13 +1,13 @@
-# ebba
+# EBBA
 
 `ebba` is a **minimal terminal editor** for text/binary file workflows.  
 Current scope is Linux-first and intentionally small.
 
 ## MVP scope and constraints
 
+- Inspired by the **fresh editor** - keybindings, ctrl+c/v etc.
 - Linux-first development/testing target for now.
-- One file per process (`FILE` positional argument is singular; no multi-buffer/tabs in this MVP).
-- Startup mode selection for text vs binary-oriented views.
+- Startup automatic or manual mode selection for text vs binary-oriented views.
 - Core editing primitives and rendering components are implemented/tested; app wiring remains intentionally minimal.
 
 ## Run
