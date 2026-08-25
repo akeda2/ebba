@@ -20,6 +20,7 @@ fn status_line_is_rendered_on_top_row() {
                 document: &doc,
                 wrap: false,
                 wrap_column: None,
+                show_invisibles: false,
             },
             status,
         },
@@ -41,6 +42,7 @@ fn text_mode_always_includes_line_number_gutter() {
             height: 1,
             wrap: false,
             wrap_column: None,
+            show_invisibles: false,
         },
     );
     assert!(rendered.lines[0].starts_with("   1 "));
@@ -57,6 +59,7 @@ fn viewport_clips_rows_based_on_scroll() {
             height: 2,
             wrap: false,
             wrap_column: None,
+            show_invisibles: false,
         },
     );
 
@@ -114,6 +117,7 @@ fn renderer_keeps_status_line_when_body_height_is_zero() {
                 document: &doc,
                 wrap: false,
                 wrap_column: None,
+                show_invisibles: false,
             },
             status: StatusLine {
                 filename: "tiny.txt".to_string(),
@@ -138,6 +142,7 @@ fn gutter_width_scales_with_total_line_count() {
             height: 1,
             wrap: false,
             wrap_column: None,
+            show_invisibles: false,
         },
     );
 
@@ -163,6 +168,7 @@ fn text_view_renders_utf8_file_content() {
             height: 2,
             wrap: false,
             wrap_column: None,
+            show_invisibles: false,
         },
     );
 
@@ -181,6 +187,7 @@ fn renderer_places_cursor_on_first_text_row_not_status_row() {
                 document: &doc,
                 wrap: false,
                 wrap_column: None,
+                show_invisibles: false,
             },
             status: StatusLine::default(),
         },
@@ -201,6 +208,7 @@ fn selection_is_visually_highlighted() {
             height: 1,
             wrap: false,
             wrap_column: None,
+            show_invisibles: false,
         },
     );
 

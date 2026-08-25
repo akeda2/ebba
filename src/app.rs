@@ -37,6 +37,7 @@ pub struct AppState {
     viewport_rows: usize,
     wrap_enabled: bool,
     wrap_column: Option<usize>,
+    show_invisibles: bool,
 }
 
 impl AppState {
@@ -54,6 +55,7 @@ impl AppState {
             viewport_rows: 20,
             wrap_enabled: false,
             wrap_column: None,
+            show_invisibles: false,
         }
     }
 
@@ -97,6 +99,14 @@ impl AppState {
         self.viewport_rows = rows.max(1);
     }
 
+    pub fn set_show_invisibles(&mut self, show: bool) {
+        self.show_invisibles = show;
+    }
+
+    pub fn show_invisibles(&self) -> bool {
+        self.show_invisibles
+    }
+
     pub fn execute_command(&mut self, command: Command) -> AppResult<CommandDisposition> {
         match command {
             Command::Quit => {
@@ -104,7 +114,7 @@ impl AppState {
                     Ok(CommandDisposition::Exit)
                 } else {
                     Err(AppError::Message(
-                        "unsaved changes: use Ctrl+S to save or Ctrl+Alt+Q/Ctrl+G/F12 to force quit"
+                        "unsaved changes: use Ctrl+S to save or Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 to force quit"
                             .to_string(),
                     ))
                 }
@@ -150,6 +160,10 @@ impl AppState {
             }
             Command::ToggleWrap => {
                 self.wrap_enabled = !self.wrap_enabled;
+                Ok(CommandDisposition::Continue)
+            }
+            Command::ToggleInvisibles => {
+                self.show_invisibles = !self.show_invisibles;
                 Ok(CommandDisposition::Continue)
             }
             Command::OutdentSelection => {
@@ -390,6 +404,7 @@ pub fn run() -> AppResult<()> {
     );
     app_state.set_hex_mode(hex_mode);
     app_state.set_read_only(read_only);
+    app_state.set_show_invisibles(args.invisibles);
     match args.wrap {
         None => {
             app_state.set_wrap_enabled(false);
@@ -413,11 +428,11 @@ pub fn run() -> AppResult<()> {
     let mut flusher = WriterFlush::new(stdout());
     let mut status_message = if app_state.is_hex_mode() {
         Some(String::from(
-            "q/Alt+Q/F10 quit • Ctrl+Alt+Q/Ctrl+G/F12 force quit • ↑/↓/PgUp/PgDn/Home/End scroll",
+            "q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • ↑/↓/PgUp/PgDn/Home/End scroll",
         ))
     } else {
         Some(String::from(
-            "Ctrl+Q/Alt+Q/F10 quit • Ctrl+Alt+Q/Ctrl+G/F12 force quit • Ctrl+T tab width • Ctrl+W wrap",
+            "Ctrl+Q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • Ctrl+T tab • Ctrl+W wrap • Ctrl+K invisibles",
         ))
     };
     let mut needs_render = true;
@@ -456,6 +471,7 @@ pub fn run() -> AppResult<()> {
                 } else {
                     None
                 },
+                show_invisibles: app_state.show_invisibles(),
                 message: status_message.clone(),
                 ..StatusLine::default()
             };
@@ -480,6 +496,7 @@ pub fn run() -> AppResult<()> {
                             document: app_state.document(),
                             wrap: app_state.is_wrap_enabled(),
                             wrap_column: app_state.wrap_column(),
+                            show_invisibles: app_state.show_invisibles(),
                         },
                         status,
                     },
@@ -520,6 +537,7 @@ pub fn run() -> AppResult<()> {
             }
             let was_cycle_tab = matches!(command, Command::CycleTabWidth);
             let was_toggle_wrap = matches!(command, Command::ToggleWrap);
+            let was_toggle_invisibles = matches!(command, Command::ToggleInvisibles);
             match app_state.execute_command(command) {
                 Ok(CommandDisposition::Exit) => return Ok(()),
                 Ok(CommandDisposition::Continue) => {
@@ -535,6 +553,13 @@ pub fn run() -> AppResult<()> {
                             "off".to_string()
                         };
                         status_message = Some(format!("Wrap: {mode}"));
+                    } else if was_toggle_invisibles {
+                        let mode = if app_state.show_invisibles() {
+                            "on"
+                        } else {
+                            "off"
+                        };
+                        status_message = Some(format!("Invisibles: {mode}"));
                     } else {
                         status_message = None;
                     }
@@ -644,6 +669,16 @@ mod tests {
         app.execute_command(Command::ToggleWrap)
             .expect("toggle wrap should succeed");
         assert!(app.is_wrap_enabled());
+    }
+
+    #[test]
+    fn toggle_invisibles_flips_runtime_state() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        assert!(!app.show_invisibles());
+        app.execute_command(Command::ToggleInvisibles)
+            .expect("toggle invisibles should succeed");
+        assert!(app.show_invisibles());
     }
 
     #[test]

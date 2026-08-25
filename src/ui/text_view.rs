@@ -11,6 +11,7 @@ pub struct TextViewport {
     pub height: usize,
     pub wrap: bool,
     pub wrap_column: Option<usize>,
+    pub show_invisibles: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,6 +45,12 @@ struct WrappedSegment {
     text: String,
     start_column: usize,
     end_column: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LineEndingKind {
+    Lf,
+    Crlf,
 }
 
 impl TextView {
@@ -89,9 +96,11 @@ fn render_unwrapped(document: &Document, viewport: TextViewport) -> TextRenderOu
         }
 
         let range = ranges[line_index];
-        let content = String::from_utf8_lossy(&bytes[range.start..range.end_no_newline]);
+        let ending = line_ending_kind(range, &bytes);
+        let content = String::from_utf8_lossy(&bytes[range.start..line_display_end(range, &bytes)]);
+        let decorated = decorate_line_text(content.as_ref(), viewport.show_invisibles, ending);
         let line_selection = selection_span_for_line(range, &bytes, selection_start, selection_end);
-        let decorated_text = render_text_with_selection(content.as_ref(), text_width, line_selection);
+        let decorated_text = render_text_with_selection(&decorated, text_width, line_selection);
         let rendered = format!(
             "{:>gutter_width$} {}",
             line_index + 1,
@@ -146,8 +155,10 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
     let mut visual_index = 0usize;
 
     for (line_index, range) in ranges.iter().copied().enumerate() {
-        let content = String::from_utf8_lossy(&bytes[range.start..range.end_no_newline]).to_string();
-        let segments = wrap_segments(&content, text_width);
+        let ending = line_ending_kind(range, &bytes);
+        let content = String::from_utf8_lossy(&bytes[range.start..line_display_end(range, &bytes)]);
+        let decorated = decorate_line_text(content.as_ref(), viewport.show_invisibles, ending);
+        let segments = wrap_segments(&decorated, text_width);
         let line_selection = selection_span_for_line(range, &bytes, selection_start, selection_end);
         let last_segment = segments.len().saturating_sub(1);
 
@@ -257,6 +268,44 @@ fn line_ranges(bytes: &[u8]) -> Vec<LineRange> {
     });
 
     ranges
+}
+
+fn line_ending_kind(range: LineRange, bytes: &[u8]) -> Option<LineEndingKind> {
+    if range.end_with_newline == range.end_no_newline {
+        return None;
+    }
+    if range.end_no_newline > range.start && bytes[range.end_no_newline.saturating_sub(1)] == b'\r' {
+        return Some(LineEndingKind::Crlf);
+    }
+    Some(LineEndingKind::Lf)
+}
+
+fn line_display_end(range: LineRange, bytes: &[u8]) -> usize {
+    match line_ending_kind(range, bytes) {
+        Some(LineEndingKind::Crlf) => range.end_no_newline.saturating_sub(1),
+        _ => range.end_no_newline,
+    }
+}
+
+fn decorate_line_text(content: &str, show_invisibles: bool, ending: Option<LineEndingKind>) -> String {
+    if !show_invisibles {
+        return content.to_string();
+    }
+
+    let mut out = String::with_capacity(content.len() + 2);
+    for ch in content.chars() {
+        if ch == ' ' {
+            out.push('·');
+        } else {
+            out.push(ch);
+        }
+    }
+    match ending {
+        Some(LineEndingKind::Lf) => out.push('␊'),
+        Some(LineEndingKind::Crlf) => out.push('␍'),
+        None => {}
+    }
+    out
 }
 
 fn offset_to_line_column(ranges: &[LineRange], bytes: &[u8], offset: usize) -> (usize, usize) {
@@ -454,6 +503,7 @@ mod tests {
                 height: 2,
                 wrap: true,
                 wrap_column: None,
+                show_invisibles: false,
             },
         );
         assert!(rendered.lines[0].contains("abcd"));
@@ -472,10 +522,29 @@ mod tests {
                 height: 3,
                 wrap: true,
                 wrap_column: Some(4),
+                show_invisibles: false,
             },
         );
         assert!(rendered.lines[0].contains("abcd"));
         assert!(rendered.lines[1].contains("efgh"));
         assert!(rendered.lines[2].contains("ij"));
+    }
+
+    #[test]
+    fn invisibles_show_space_and_line_ending_markers() {
+        let doc = Document::from_bytes(b"a b\r\nx\n".to_vec());
+        let rendered = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 20,
+                height: 2,
+                wrap: false,
+                wrap_column: None,
+                show_invisibles: true,
+            },
+        );
+        assert!(rendered.lines[0].contains("a·b␍"));
+        assert!(rendered.lines[1].contains("x␊"));
     }
 }

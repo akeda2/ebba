@@ -13,7 +13,7 @@ Current scope is Linux-first and intentionally small.
 ## Run
 
 ```bash
-cargo run -- [FILE] [--encoding ENCODING] [--line-ending <lf|crlf>] [--text|--binary] [--wrap [COLUMN]] [--config PATH]
+cargo run -- [FILE] [--encoding ENCODING] [--line-ending <lf|crlf>] [--text|--binary] [--wrap [COLUMN]] [--invisibles] [--config PATH]
 ```
 
 `--text` and `--binary` are mutually exclusive.
@@ -33,6 +33,8 @@ cargo run -- [FILE] [--encoding ENCODING] [--line-ending <lf|crlf>] [--text|--bi
 - `--wrap [COLUMN]`  
   Enable line wrapping at startup (default is off).  
   Example: `--wrap 80` wraps at 80 text columns (line-number gutter excluded).
+- `--invisibles`  
+  Show invisible characters at startup (spaces as `·`, LF as `␊`, CRLF as `␍`).
 
 ## Rendering behavior in MVP
 
@@ -45,8 +47,9 @@ Current input mapping includes:
 
 - `Ctrl+S` save
 - `Ctrl+Q`, `Alt+Q`, or `F10` quit
-- `Ctrl+Alt+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, or `F12` force-quit
+- `Ctrl+Alt+Q`, `Alt+Shift+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, or `F12` force-quit
 - `Ctrl+W` toggle line wrap on/off
+- `Ctrl+K` toggle invisible characters on/off
 - `Ctrl+C` copy, `Ctrl+X` cut, `Ctrl+V` paste, `Ctrl+A` select-all
 - `Ctrl+Z` undo, `Ctrl+Y` / `Ctrl+Shift+Z` redo
 

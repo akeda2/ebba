@@ -13,6 +13,7 @@ pub enum RenderMode<'a> {
         document: &'a Document,
         wrap: bool,
         wrap_column: Option<usize>,
+        show_invisibles: bool,
     },
     Hex { bytes: &'a [u8] },
 }
@@ -127,6 +128,7 @@ impl Renderer {
                 document,
                 wrap,
                 wrap_column,
+                show_invisibles,
             } => {
                 let mut text = self.render_text(
                     state,
@@ -135,6 +137,7 @@ impl Renderer {
                     body_height,
                     wrap,
                     wrap_column,
+                    show_invisibles,
                 );
                 status = status.with_position(
                     text.cursor_line + 1,
@@ -171,6 +174,7 @@ impl Renderer {
         body_height: usize,
         wrap: bool,
         wrap_column: Option<usize>,
+        show_invisibles: bool,
     ) -> TextRenderOutput {
         let previous_scroll = state.scroll_row;
         let mut rendered = TextView::render(
@@ -181,6 +185,7 @@ impl Renderer {
                 height: body_height,
                 wrap,
                 wrap_column,
+                show_invisibles,
             },
         );
         state.ensure_cursor_visible(rendered.cursor_line, rendered.total_lines);
@@ -193,6 +198,7 @@ impl Renderer {
                     height: body_height,
                     wrap,
                     wrap_column,
+                    show_invisibles,
                 },
             );
         }

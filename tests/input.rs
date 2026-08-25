@@ -43,6 +43,7 @@ fn maps_core_ctrl_shortcuts() {
         (KeyCode::Char('s'), Command::Save),
         (KeyCode::Char('t'), Command::CycleTabWidth),
         (KeyCode::Char('w'), Command::ToggleWrap),
+        (KeyCode::Char('k'), Command::ToggleInvisibles),
     ];
 
     for (code, expected) in cases {

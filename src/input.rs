@@ -92,6 +92,7 @@ pub fn command_from_key_event(key_event: KeyEvent) -> Option<Command> {
                 's' => Some(Command::Save),
                 't' => Some(Command::CycleTabWidth),
                 'w' => Some(Command::ToggleWrap),
+                'k' => Some(Command::ToggleInvisibles),
                 'c' => Some(Command::Copy),
                 'x' => Some(Command::Cut),
                 'v' => Some(Command::Paste),

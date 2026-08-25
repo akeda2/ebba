@@ -29,6 +29,7 @@ pub enum Command {
     Delete,
     CycleTabWidth,
     ToggleWrap,
+    ToggleInvisibles,
     OutdentSelection,
     Copy,
     Cut,

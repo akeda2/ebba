@@ -27,6 +27,8 @@ pub struct Cli {
     #[arg(long, num_args = 0..=1, value_name = "COLUMN", value_parser = parse_wrap_column)]
     pub wrap: Option<Option<usize>>,
     #[arg(long)]
+    pub invisibles: bool,
+    #[arg(long)]
     pub config: Option<PathBuf>,
 }
 
