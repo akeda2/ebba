@@ -87,6 +87,8 @@ pub fn command_from_key_event(key_event: KeyEvent) -> Option<Command> {
                 'q' if shift || ch.is_ascii_uppercase() => Some(Command::ForceQuit),
                 'q' if alt => Some(Command::ForceQuit),
                 'q' => Some(Command::Quit),
+                'g' if shift || ch.is_ascii_uppercase() => Some(Command::ForceQuit),
+                'g' => Some(Command::ForceQuit),
                 's' => Some(Command::Save),
                 't' => Some(Command::CycleTabWidth),
                 'w' => Some(Command::ToggleWrap),
@@ -100,6 +102,9 @@ pub fn command_from_key_event(key_event: KeyEvent) -> Option<Command> {
                 _ => None,
             }
         }
+        KeyCode::Char('q') if alt && shift => Some(Command::ForceQuit),
+        KeyCode::Char('q') if alt => Some(Command::Quit),
+        KeyCode::Char('Q') if alt => Some(Command::ForceQuit),
         KeyCode::Char(ch) if !alt => Some(Command::InsertChar(ch)),
         KeyCode::Tab => Some(Command::InsertChar('\t')),
         KeyCode::BackTab => Some(Command::OutdentSelection),
@@ -107,6 +112,8 @@ pub fn command_from_key_event(key_event: KeyEvent) -> Option<Command> {
         KeyCode::Backspace => Some(Command::Backspace),
         KeyCode::Delete => Some(Command::Delete),
         KeyCode::Esc => Some(Command::ForceQuit),
+        KeyCode::F(10) => Some(Command::Quit),
+        KeyCode::F(12) => Some(Command::ForceQuit),
         KeyCode::Left if ctrl => Some(Command::Move {
             direction: MoveCommand::WordLeft,
             extend: shift,

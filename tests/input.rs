@@ -64,6 +64,24 @@ fn maps_escape_to_force_quit() {
 }
 
 #[test]
+fn maps_alt_q_to_quit() {
+    let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::ALT);
+    assert_eq!(command_from_key_event(key), Some(Command::Quit));
+}
+
+#[test]
+fn maps_f10_to_quit() {
+    let key = KeyEvent::new(KeyCode::F(10), KeyModifiers::NONE);
+    assert_eq!(command_from_key_event(key), Some(Command::Quit));
+}
+
+#[test]
+fn maps_ctrl_g_to_force_quit() {
+    let key = KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL);
+    assert_eq!(command_from_key_event(key), Some(Command::ForceQuit));
+}
+
+#[test]
 fn maps_shift_arrow_to_extending_selection_move() {
     let key = KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT);
     assert_eq!(

@@ -104,7 +104,7 @@ impl AppState {
                     Ok(CommandDisposition::Exit)
                 } else {
                     Err(AppError::Message(
-                        "unsaved changes: use Ctrl+S to save or Ctrl+Alt+Q to force quit"
+                        "unsaved changes: use Ctrl+S to save or Esc/Ctrl+G/Ctrl+Alt+Q to force quit"
                             .to_string(),
                     ))
                 }
@@ -413,11 +413,11 @@ pub fn run() -> AppResult<()> {
     let mut flusher = WriterFlush::new(stdout());
     let mut status_message = if app_state.is_hex_mode() {
         Some(String::from(
-            "q quit • Esc force quit • ↑/↓/PgUp/PgDn/Home/End scroll",
+            "q/Alt+Q/F10 quit • Esc/Ctrl+G/F12 force quit • ↑/↓/PgUp/PgDn/Home/End scroll",
         ))
     } else {
         Some(String::from(
-            "Ctrl+Q quit • Ctrl+Alt+Q force quit • Ctrl+T tab width • Ctrl+W wrap",
+            "Ctrl+Q/Alt+Q/F10 quit • Esc/Ctrl+G/F12 force quit • Ctrl+T tab width • Ctrl+W wrap",
         ))
     };
     let mut needs_render = true;

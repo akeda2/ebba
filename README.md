@@ -44,8 +44,8 @@ cargo run -- [FILE] [--encoding ENCODING] [--line-ending <lf|crlf>] [--text|--bi
 Current input mapping includes:
 
 - `Ctrl+S` save
-- `Ctrl+Q` quit
-- `Ctrl+Alt+Q` or `Ctrl+Shift+Q` force-quit
+- `Ctrl+Q`, `Alt+Q`, or `F10` quit
+- `Ctrl+Alt+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, `Esc`, or `F12` force-quit
 - `Ctrl+W` toggle line wrap on/off
 - `Ctrl+C` copy, `Ctrl+X` cut, `Ctrl+V` paste, `Ctrl+A` select-all
 - `Ctrl+Z` undo, `Ctrl+Y` / `Ctrl+Shift+Z` redo
