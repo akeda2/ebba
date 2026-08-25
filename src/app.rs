@@ -69,6 +69,10 @@ impl AppState {
         self.tab_width
     }
 
+    pub fn is_hex_mode(&self) -> bool {
+        self.hex_mode
+    }
+
     pub fn set_viewport_rows(&mut self, rows: usize) {
         self.viewport_rows = rows.max(1);
     }
@@ -85,6 +89,7 @@ impl AppState {
                     ))
                 }
             }
+
             Command::ForceQuit => Ok(CommandDisposition::Exit),
             Command::Save => {
                 if self.read_only {
@@ -248,6 +253,33 @@ impl AppState {
     }
 }
 
+fn hex_total_rows(byte_len: usize) -> usize {
+    ((byte_len + 15) / 16).max(1)
+}
+
+fn apply_hex_scroll(state: &mut RenderState, direction: MoveCommand, total_rows: usize) -> bool {
+    let before = state.scroll_row;
+    let page = state.body_height().max(1);
+    let max_scroll = total_rows.saturating_sub(page);
+
+    state.scroll_row = match direction {
+        MoveCommand::Up => state.scroll_row.saturating_sub(1),
+        MoveCommand::Down => (state.scroll_row + 1).min(max_scroll),
+        MoveCommand::PageUp => state.scroll_row.saturating_sub(page),
+        MoveCommand::PageDown => state.scroll_row.saturating_add(page).min(max_scroll),
+        MoveCommand::DocumentStart => 0,
+        MoveCommand::DocumentEnd => max_scroll,
+        MoveCommand::Left
+        | MoveCommand::Right
+        | MoveCommand::LineStart
+        | MoveCommand::LineEnd
+        | MoveCommand::WordLeft
+        | MoveCommand::WordRight => state.scroll_row,
+    };
+    state.clamp_scroll(total_rows);
+    state.scroll_row != before
+}
+
 pub fn run() -> AppResult<()> {
     let args = Cli::parse_args();
     let config_line_ending = if args.config.is_some() {
@@ -341,8 +373,13 @@ pub fn run() -> AppResult<()> {
     let renderer = Renderer;
     let mut render_state = RenderState::new(terminal.width, terminal.height);
     let mut flusher = WriterFlush::new(stdout());
-    let mut status_message =
-        Some(String::from("Ctrl+Q quit • Ctrl+Alt+Q force quit • Ctrl+T tab width"));
+    let mut status_message = if app_state.is_hex_mode() {
+        Some(String::from(
+            "q quit • Esc force quit • ↑/↓/PgUp/PgDn/Home/End scroll",
+        ))
+    } else {
+        Some(String::from("Ctrl+Q quit • Ctrl+Alt+Q force quit • Ctrl+T tab width"))
+    };
     let mut needs_render = true;
 
     loop {
@@ -414,6 +451,26 @@ pub fn run() -> AppResult<()> {
 
         app_state.set_viewport_rows(render_state.body_height().max(1));
         for command in commands {
+            if app_state.is_hex_mode() {
+                match command {
+                    Command::InsertChar('q') => return Ok(()),
+                    Command::InsertChar('Q') => return Ok(()),
+                    _ => {}
+                }
+            }
+            if app_state.is_hex_mode()
+                && let Command::Move { direction, .. } = command
+            {
+                let bytes = app_state
+                    .document()
+                    .bytes()
+                    .map_err(|error| AppError::Message(error.to_string()))?;
+                if apply_hex_scroll(&mut render_state, direction, hex_total_rows(bytes.len())) {
+                    needs_render = true;
+                }
+                status_message = None;
+                continue;
+            }
             let was_cycle_tab = matches!(command, Command::CycleTabWidth);
             match app_state.execute_command(command) {
                 Ok(CommandDisposition::Exit) => return Ok(()),
@@ -442,7 +499,9 @@ mod tests {
     use crate::command::{Command, MoveCommand};
     use crate::document::Document;
 
-    use super::{AppState, CommandDisposition};
+    use crate::ui::renderer::RenderState;
+
+    use super::{AppState, CommandDisposition, apply_hex_scroll};
 
     fn fixture_path(name: &str) -> PathBuf {
         let path = PathBuf::from("target/test-fixtures");
@@ -565,5 +624,25 @@ mod tests {
         let line_offset = one_line.document().selection().active.byte_offset;
 
         assert!(page_offset > line_offset);
+    }
+
+    #[test]
+    fn hex_page_down_scrolls_by_visible_rows() {
+        let mut state = RenderState::new(80, 21);
+        let changed = apply_hex_scroll(&mut state, MoveCommand::PageDown, 100);
+        assert!(changed);
+        assert_eq!(state.scroll_row, 20);
+    }
+
+    #[test]
+    fn hex_left_right_do_not_change_scroll() {
+        let mut state = RenderState::new(80, 21);
+        state.scroll_row = 5;
+        let left_changed = apply_hex_scroll(&mut state, MoveCommand::Left, 100);
+        assert!(!left_changed);
+        assert_eq!(state.scroll_row, 5);
+        let right_changed = apply_hex_scroll(&mut state, MoveCommand::Right, 100);
+        assert!(!right_changed);
+        assert_eq!(state.scroll_row, 5);
     }
 }
