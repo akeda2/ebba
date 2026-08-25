@@ -8,7 +8,7 @@ pub struct StatusLine {
     pub total_lines: usize,
     pub encoding: String,
     pub line_ending: String,
-    pub wrap_enabled: bool,
+    pub wrap_column: Option<usize>,
     pub message: Option<String>,
 }
 
@@ -23,7 +23,7 @@ impl Default for StatusLine {
             total_lines: 1,
             encoding: String::from("utf-8"),
             line_ending: String::from("LF"),
-            wrap_enabled: false,
+            wrap_column: None,
             message: Some(String::from("ready")),
         }
     }
@@ -40,7 +40,11 @@ impl StatusLine {
     pub fn render(&self, width: usize) -> String {
         let modified = if self.dirty { "*" } else { "-" };
         let access = if self.read_only { "RO" } else { "RW" };
-        let wrap = if self.wrap_enabled { "WRAP:ON" } else { "WRAP:OFF" };
+        let wrap = match self.wrap_column {
+            None => String::from("WRAP:OFF"),
+            Some(0) => String::from("WRAP:ON"),
+            Some(column) => format!("WRAP:{column}"),
+        };
         let left = format!(
             "{} [{}|{}] Ln {}, Col {} / {} {} {} {}",
             self.filename,

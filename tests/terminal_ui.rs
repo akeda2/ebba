@@ -19,6 +19,7 @@ fn status_line_is_rendered_on_top_row() {
             mode: RenderMode::Text {
                 document: &doc,
                 wrap: false,
+                wrap_column: None,
             },
             status,
         },
@@ -39,6 +40,7 @@ fn text_mode_always_includes_line_number_gutter() {
             width: 20,
             height: 1,
             wrap: false,
+            wrap_column: None,
         },
     );
     assert!(rendered.lines[0].starts_with("   1 "));
@@ -54,6 +56,7 @@ fn viewport_clips_rows_based_on_scroll() {
             width: 20,
             height: 2,
             wrap: false,
+            wrap_column: None,
         },
     );
 
@@ -110,6 +113,7 @@ fn renderer_keeps_status_line_when_body_height_is_zero() {
             mode: RenderMode::Text {
                 document: &doc,
                 wrap: false,
+                wrap_column: None,
             },
             status: StatusLine {
                 filename: "tiny.txt".to_string(),
@@ -133,6 +137,7 @@ fn gutter_width_scales_with_total_line_count() {
             width: 20,
             height: 1,
             wrap: false,
+            wrap_column: None,
         },
     );
 
@@ -157,6 +162,7 @@ fn text_view_renders_utf8_file_content() {
             width: 40,
             height: 2,
             wrap: false,
+            wrap_column: None,
         },
     );
 
@@ -174,6 +180,7 @@ fn renderer_places_cursor_on_first_text_row_not_status_row() {
             mode: RenderMode::Text {
                 document: &doc,
                 wrap: false,
+                wrap_column: None,
             },
             status: StatusLine::default(),
         },
@@ -193,6 +200,7 @@ fn selection_is_visually_highlighted() {
             width: 30,
             height: 1,
             wrap: false,
+            wrap_column: None,
         },
     );
 

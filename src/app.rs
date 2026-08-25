@@ -36,6 +36,7 @@ pub struct AppState {
     tab_width: usize,
     viewport_rows: usize,
     wrap_enabled: bool,
+    wrap_column: Option<usize>,
 }
 
 impl AppState {
@@ -52,6 +53,7 @@ impl AppState {
             tab_width: 2,
             viewport_rows: 20,
             wrap_enabled: false,
+            wrap_column: None,
         }
     }
 
@@ -81,6 +83,14 @@ impl AppState {
 
     pub fn set_wrap_enabled(&mut self, enabled: bool) {
         self.wrap_enabled = enabled;
+    }
+
+    pub fn set_wrap_column(&mut self, column: Option<usize>) {
+        self.wrap_column = column.filter(|value| *value > 0);
+    }
+
+    pub fn wrap_column(&self) -> Option<usize> {
+        self.wrap_column
     }
 
     pub fn set_viewport_rows(&mut self, rows: usize) {
@@ -380,7 +390,20 @@ pub fn run() -> AppResult<()> {
     );
     app_state.set_hex_mode(hex_mode);
     app_state.set_read_only(read_only);
-    app_state.set_wrap_enabled(args.wrap);
+    match args.wrap {
+        None => {
+            app_state.set_wrap_enabled(false);
+            app_state.set_wrap_column(None);
+        }
+        Some(None) => {
+            app_state.set_wrap_enabled(true);
+            app_state.set_wrap_column(None);
+        }
+        Some(Some(column)) => {
+            app_state.set_wrap_enabled(true);
+            app_state.set_wrap_column(Some(column));
+        }
+    }
 
     let mut terminal = Terminal::new()?;
     let _terminal_modes = TerminalModeGuard::enter()?;
@@ -428,7 +451,11 @@ pub fn run() -> AppResult<()> {
                     })
                     .map(str::to_string)
                     .unwrap_or_else(|| "PRESERVE".to_string()),
-                wrap_enabled: app_state.is_wrap_enabled(),
+                wrap_column: if app_state.is_wrap_enabled() {
+                    Some(app_state.wrap_column().unwrap_or(0))
+                } else {
+                    None
+                },
                 message: status_message.clone(),
                 ..StatusLine::default()
             };
@@ -452,6 +479,7 @@ pub fn run() -> AppResult<()> {
                         mode: RenderMode::Text {
                             document: app_state.document(),
                             wrap: app_state.is_wrap_enabled(),
+                            wrap_column: app_state.wrap_column(),
                         },
                         status,
                     },
@@ -498,7 +526,14 @@ pub fn run() -> AppResult<()> {
                     if was_cycle_tab {
                         status_message = Some(format!("Tab width: {}", app_state.tab_width()));
                     } else if was_toggle_wrap {
-                        let mode = if app_state.is_wrap_enabled() { "on" } else { "off" };
+                        let mode = if app_state.is_wrap_enabled() {
+                            app_state
+                                .wrap_column()
+                                .map(|column| column.to_string())
+                                .unwrap_or_else(|| "on".to_string())
+                        } else {
+                            "off".to_string()
+                        };
                         status_message = Some(format!("Wrap: {mode}"));
                     } else {
                         status_message = None;

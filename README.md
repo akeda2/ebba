@@ -13,7 +13,7 @@ Current scope is Linux-first and intentionally small.
 ## Run
 
 ```bash
-cargo run -- [FILE] [--encoding ENCODING] [--line-ending <lf|crlf>] [--text|--binary] [--wrap] [--config PATH]
+cargo run -- [FILE] [--encoding ENCODING] [--line-ending <lf|crlf>] [--text|--binary] [--wrap [COLUMN]] [--config PATH]
 ```
 
 `--text` and `--binary` are mutually exclusive.
@@ -30,8 +30,9 @@ cargo run -- [FILE] [--encoding ENCODING] [--line-ending <lf|crlf>] [--text|--bi
   Force hex read-only startup mode.
 - `--config PATH`  
   Load YAML config from an explicit path.
-- `--wrap`  
-  Enable line wrapping at startup (default is off).
+- `--wrap [COLUMN]`  
+  Enable line wrapping at startup (default is off).  
+  Example: `--wrap 80` wraps at 80 text columns (line-number gutter excluded).
 
 ## Rendering behavior in MVP
 

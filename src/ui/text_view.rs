@@ -10,6 +10,7 @@ pub struct TextViewport {
     pub width: usize,
     pub height: usize,
     pub wrap: bool,
+    pub wrap_column: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -132,7 +133,12 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
     let selection_start = selection.start().min(bytes.len());
     let selection_end = selection.end().min(bytes.len());
     let gutter_width = gutter_width(total_lines);
-    let text_width = viewport.width.saturating_sub(gutter_width + 1).max(1);
+    let viewport_text_width = viewport.width.saturating_sub(gutter_width + 1).max(1);
+    let text_width = viewport
+        .wrap_column
+        .filter(|column| *column > 0)
+        .map(|column| column.min(viewport_text_width))
+        .unwrap_or(viewport_text_width);
 
     let mut visual_rows: Vec<(usize, bool, String)> = Vec::new();
     let mut cursor_visual_row = 0usize;
@@ -447,10 +453,29 @@ mod tests {
                 width: 9,
                 height: 2,
                 wrap: true,
+                wrap_column: None,
             },
         );
         assert!(rendered.lines[0].contains("abcd"));
         assert!(rendered.lines[1].contains("ef"));
         assert!(rendered.lines[1].starts_with("     "));
+    }
+
+    #[test]
+    fn wraps_at_requested_column_without_counting_gutter() {
+        let doc = Document::from_bytes(b"abcdefghij".to_vec());
+        let rendered = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 20,
+                height: 3,
+                wrap: true,
+                wrap_column: Some(4),
+            },
+        );
+        assert!(rendered.lines[0].contains("abcd"));
+        assert!(rendered.lines[1].contains("efgh"));
+        assert!(rendered.lines[2].contains("ij"));
     }
 }

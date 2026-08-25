@@ -24,10 +24,20 @@ pub struct Cli {
     pub text: bool,
     #[arg(long, conflicts_with = "text")]
     pub binary: bool,
-    #[arg(long)]
-    pub wrap: bool,
+    #[arg(long, num_args = 0..=1, value_name = "COLUMN", value_parser = parse_wrap_column)]
+    pub wrap: Option<Option<usize>>,
     #[arg(long)]
     pub config: Option<PathBuf>,
+}
+
+fn parse_wrap_column(raw: &str) -> Result<usize, String> {
+    let value = raw
+        .parse::<usize>()
+        .map_err(|_| format!("invalid wrap column `{raw}`"))?;
+    if value == 0 {
+        return Err("wrap column must be greater than 0".to_string());
+    }
+    Ok(value)
 }
 
 impl Cli {
