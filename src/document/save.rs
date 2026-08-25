@@ -123,6 +123,9 @@ pub fn save_piece_tree_atomic(
         file.flush()?;
         file.sync_all()?;
         drop(file);
+        if let Ok(metadata) = fs::metadata(destination) {
+            fs::set_permissions(&temp_path, metadata.permissions())?;
+        }
         fs::rename(&temp_path, destination)?;
         sync_parent_directory(parent)?;
         Ok(())

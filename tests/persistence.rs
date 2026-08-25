@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
+#[cfg(unix)]
+use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
 use ebba::document::Document;
 use ebba::document::encoding::DetectedEncoding;
@@ -178,6 +180,32 @@ fn failed_save_keeps_dirty_and_removes_temporary_file() {
         fs::read(&output_path).expect("destination should still exist"),
         b"ORIGINAL"
     );
+
+    fs::remove_file(output_path).expect("fixture cleanup should succeed");
+}
+
+#[cfg(unix)]
+#[test]
+fn save_preserves_executable_permission_bits() {
+    let output_path = fixture_path("save-preserve-executable");
+    fs::write(&output_path, b"#!/bin/sh\necho hi\n").expect("fixture write should succeed");
+    fs::set_permissions(&output_path, Permissions::from_mode(0o755))
+        .expect("permissions should be set");
+
+    let mut document = Document::from_bytes(b"#!/bin/sh\necho hi\n".to_vec());
+    document.set_path(output_path.clone());
+    document.insert_text("#").expect("edit should succeed");
+
+    document
+        .save(SaveOverrides::default())
+        .expect("save should succeed");
+
+    let mode = fs::metadata(&output_path)
+        .expect("metadata should be readable")
+        .permissions()
+        .mode()
+        & 0o777;
+    assert_eq!(mode, 0o755);
 
     fs::remove_file(output_path).expect("fixture cleanup should succeed");
 }
