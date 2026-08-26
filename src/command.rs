@@ -27,6 +27,8 @@ pub enum Command {
     NewLine,
     Backspace,
     Delete,
+    DeleteWordBackward,
+    DeleteToLineStart,
     CycleTabWidth,
     ShowHelp,
     ToggleBom,

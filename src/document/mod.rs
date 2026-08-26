@@ -291,7 +291,9 @@ impl Document {
     pub fn move_line_end(&mut self, extend: bool) -> Result<(), DocumentError> {
         self.history.flush_pending();
         self.preferred_column = None;
-        let target = self.tree.line_end_offset(self.selection.active.byte_offset)?;
+        let target = self
+            .tree
+            .line_end_offset(self.selection.active.byte_offset)?;
         self.set_active_cursor(target, extend);
         Ok(())
     }
@@ -365,6 +367,70 @@ impl Document {
         let after_bytes = self.tree.read_all()?;
         self.history.record_edit(
             EditGroupKind::DeleteForward,
+            before_bytes,
+            before_selection,
+            after_bytes,
+            self.selection,
+        );
+        self.preferred_column = None;
+        self.persistence.dirty = true;
+        Ok(())
+    }
+
+    pub fn delete_word_backward(&mut self) -> Result<(), DocumentError> {
+        if !self.selection.is_caret() {
+            return self.edit_replace_selection(Vec::new(), EditGroupKind::Other);
+        }
+
+        let caret = self.selection.active.byte_offset;
+        if caret == 0 {
+            return Ok(());
+        }
+
+        let before_bytes = self.tree.read_all()?;
+        let before_selection = self.selection;
+        let start = previous_word_start_offset(&before_bytes, caret);
+        if start == caret {
+            return Ok(());
+        }
+
+        self.tree.delete(start, caret - start)?;
+        self.selection = Selection::caret(start);
+        let after_bytes = self.tree.read_all()?;
+        self.history.record_edit(
+            EditGroupKind::Other,
+            before_bytes,
+            before_selection,
+            after_bytes,
+            self.selection,
+        );
+        self.preferred_column = None;
+        self.persistence.dirty = true;
+        Ok(())
+    }
+
+    pub fn delete_to_line_start(&mut self) -> Result<(), DocumentError> {
+        if !self.selection.is_caret() {
+            return self.edit_replace_selection(Vec::new(), EditGroupKind::Other);
+        }
+
+        let caret = self.selection.active.byte_offset;
+        if caret == 0 {
+            return Ok(());
+        }
+
+        let start = self.tree.line_start_offset(caret)?;
+        if start == caret {
+            return Ok(());
+        }
+
+        let before_bytes = self.tree.read_all()?;
+        let before_selection = self.selection;
+        self.tree.delete(start, caret - start)?;
+        self.selection = Selection::caret(start);
+        let after_bytes = self.tree.read_all()?;
+        self.history.record_edit(
+            EditGroupKind::Other,
             before_bytes,
             before_selection,
             after_bytes,
@@ -546,8 +612,14 @@ impl Document {
         }
 
         self.tree.replace_all(out)?;
-        self.selection.anchor = Cursor::new(adjust_offset(before_selection.anchor.byte_offset, &removals));
-        self.selection.active = Cursor::new(adjust_offset(before_selection.active.byte_offset, &removals));
+        self.selection.anchor = Cursor::new(adjust_offset(
+            before_selection.anchor.byte_offset,
+            &removals,
+        ));
+        self.selection.active = Cursor::new(adjust_offset(
+            before_selection.active.byte_offset,
+            &removals,
+        ));
         self.selection.clamp_to(self.tree.len());
 
         let after_bytes = self.tree.read_all()?;
@@ -621,4 +693,50 @@ impl Document {
             self.selection = Selection::caret(target);
         }
     }
+}
+
+fn previous_word_start_offset(bytes: &[u8], caret: usize) -> usize {
+    let caret = caret.min(bytes.len());
+    if caret == 0 {
+        return 0;
+    }
+
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return caret.saturating_sub(1);
+    };
+
+    let mut cursor = previous_char_boundary(text, caret);
+    while cursor > 0 {
+        let Some(ch) = previous_char(text, cursor) else {
+            break;
+        };
+        if !ch.is_whitespace() {
+            break;
+        }
+        cursor -= ch.len_utf8();
+    }
+
+    while cursor > 0 {
+        let Some(ch) = previous_char(text, cursor) else {
+            break;
+        };
+        if ch.is_whitespace() {
+            break;
+        }
+        cursor -= ch.len_utf8();
+    }
+
+    cursor
+}
+
+fn previous_char_boundary(text: &str, offset: usize) -> usize {
+    let mut cursor = offset.min(text.len());
+    while cursor > 0 && !text.is_char_boundary(cursor) {
+        cursor -= 1;
+    }
+    cursor
+}
+
+fn previous_char(text: &str, end_offset: usize) -> Option<char> {
+    text[..end_offset].chars().next_back()
 }

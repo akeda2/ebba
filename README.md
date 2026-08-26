@@ -72,63 +72,61 @@ ebba README.md --wrap 80 --invisibles
   Show invisible characters (space `·`, LF `␊`, CRLF `␍`).
 - `--config <PATH>`  
   Load YAML config from explicit path.
+- `--keymap <auto|mac|linux>`  
+  Force keybinding profile at startup (useful for cross-platform keymap testing).
 
 `--text` and `--binary` are mutually exclusive.
 
 ## Keybindings
 
-### Core
+`ebba` auto-detects macOS and switches to a macOS-oriented profile.
+
+### macOS profile
+
+Terminal apps on macOS may intercept some `⌘` keys before `ebba` receives them. Control fallbacks remain available for all core actions.
+
+- Save: `⌘S`, fallback `Ctrl+S`
+- Help: `⇧⌘?`, fallback `Ctrl+H`
+- Quit: `⌘Q`, fallback `Ctrl+Q`, `F10`
+- Force quit: `Ctrl+Alt+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, `F12`
+- Copy/Cut/Paste: `⌘C`, `⌘X`, `⌘V` (plus `Ctrl+C/X/V`)
+- Select all: `⌘A` (plus `Ctrl+A`)
+- Undo/Redo: `⌘Z`, `⇧⌘Z` (plus `Ctrl+Y`)
+- Word move: `⌥←`, `⌥→` (plus `Ctrl+←`, `Ctrl+→`)
+- Line move: `⌘←`, `⌘→`
+- Document move: `⌘↑`, `⌘↓` (plus `Ctrl+Home`, `Ctrl+End`)
+- Delete previous word: `⌥Backspace` (plus `Ctrl+Backspace`)
+- Delete to line start: `⌘Backspace` (plus `Ctrl+U`)
+- Editor toggles (editor-specific): `Ctrl+B` BOM, `Ctrl+T` tab width, `Ctrl+W` wrap, `Ctrl+K` invisibles
+
+### Linux/other profile
 
 - Save: `Ctrl+S`
 - Help: `Ctrl+H`, `Alt+H`
 - Quit: `Ctrl+Q`, `Alt+Q`, `F10`
 - Force quit: `Ctrl+Alt+Q`, `Alt+Shift+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, `F12`
-
-### Editing
-
-- Insert newline: `Enter`
-- Backspace: `Backspace`
-- Delete forward: `Delete`
-- Insert tab / indent selection: `Tab`
-- Outdent selection: `Shift+Tab`
-
-### Tab indenting
-- Pressing 'Tab' after selecting one/multiple lines will move all selected lines one tab-spacing.
-- 'Shift+Tab' does the opposite.
-
-### Clipboard and selection
-
-- Copy: `Ctrl+C`
-- Cut: `Ctrl+X`
-- Paste: `Ctrl+V`
+- Copy/Cut/Paste: `Ctrl+C`, `Ctrl+X`, `Ctrl+V`
 - Terminal clipboard copy/paste: `Ctrl+Shift+C`, `Ctrl+Shift+V`
 - Select all: `Ctrl+A`
-
-### Undo/redo
-
-- Undo: `Ctrl+Z`
-- Redo: `Ctrl+Y`, `Ctrl+Shift+Z`
-
-### Toggles
-
+- Undo/Redo: `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`
+- Word move: `Ctrl+←`, `Ctrl+→`
+- Line move: `Home`, `End`
+- Document move: `Ctrl+Home`, `Ctrl+End`
+- Delete previous word: `Ctrl+Backspace`
+- Delete to line start: `Ctrl+U`
 - Toggle BOM: `Ctrl+B`, `Alt+B`, `Ctrl+Shift+B`
 - Toggle tab width (2 → 4 → 8): `Ctrl+T`
 - Toggle wrap: `Ctrl+W`
 - Toggle invisibles: `Ctrl+K`, `Alt+I`
 
-### Navigation
+### Shared editing and selection
 
-- Cursor move: `←`, `→`, `↑`, `↓`
-- Word move: `Ctrl+←`, `Ctrl+→`
-- Line boundaries: `Home`, `End`
-- Document boundaries: `Ctrl+Home`, `Ctrl+End`
-- Page move: `PageUp`, `PageDown`
-
-### Extend selection
-
-- Extend with arrows: `Shift+←`, `Shift+→`, `Shift+↑`, `Shift+↓`
-- Extend by page: `Shift+PageUp`, `Shift+PageDown`
-- Extend with document boundaries: `Ctrl+Shift+Home`, `Ctrl+Shift+End`
+- Insert newline: `Enter`
+- Backspace: `Backspace`
+- Delete forward: `Delete` (`fn+Backspace` on many Mac keyboards)
+- Insert tab / indent selection: `Tab`
+- Outdent selection: `Shift+Tab`
+- Extend selection: add `Shift` to movement keys (arrows, page keys, word/document jumps)
 
 ### Hex mode notes
 

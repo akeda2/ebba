@@ -12,7 +12,7 @@ use crate::{
         format::LineEndingMode,
         save::{SaveEncoding, SaveError, SaveOverrides},
     },
-    input::EventLoop,
+    input::{EventLoop, KeybindingProfile},
     terminal::{Terminal, TerminalModeGuard},
     ui::{
         renderer::{RenderMode, RenderRequest, RenderState, Renderer, TerminalFlush, WriterFlush},
@@ -43,6 +43,7 @@ pub struct AppState {
     wrap_enabled: bool,
     wrap_column: Option<usize>,
     show_invisibles: bool,
+    keybinding_profile: KeybindingProfile,
 }
 
 impl AppState {
@@ -67,6 +68,7 @@ impl AppState {
             wrap_enabled: false,
             wrap_column: None,
             show_invisibles: false,
+            keybinding_profile: KeybindingProfile::current(),
         }
     }
 
@@ -122,6 +124,10 @@ impl AppState {
         self.show_invisibles
     }
 
+    pub fn set_keybinding_profile(&mut self, profile: KeybindingProfile) {
+        self.keybinding_profile = profile;
+    }
+
     pub fn is_dirty(&self) -> bool {
         self.document.is_dirty() || self.format_dirty
     }
@@ -132,10 +138,9 @@ impl AppState {
                 if self.document.can_quit() && !self.format_dirty {
                     Ok(CommandDisposition::Exit)
                 } else {
-                    Err(AppError::Message(
-                        "unsaved changes: use Ctrl+S to save or Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 to force quit"
-                            .to_string(),
-                    ))
+                    Err(AppError::Message(unsaved_changes_message(
+                        self.keybinding_profile,
+                    )))
                 }
             }
 
@@ -187,7 +192,8 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
-                if self.document.detected_encoding() == crate::document::encoding::DetectedEncoding::Unknown8Bit
+                if self.document.detected_encoding()
+                    == crate::document::encoding::DetectedEncoding::Unknown8Bit
                     && !self
                         .save_overrides
                         .encoding
@@ -246,6 +252,24 @@ impl AppState {
                 }
                 self.document
                     .delete_forward()
+                    .map_err(|error| AppError::Message(error.to_string()))?;
+                Ok(CommandDisposition::Continue)
+            }
+            Command::DeleteWordBackward => {
+                if self.read_only {
+                    return Err(AppError::Message("buffer is read-only".to_string()));
+                }
+                self.document
+                    .delete_word_backward()
+                    .map_err(|error| AppError::Message(error.to_string()))?;
+                Ok(CommandDisposition::Continue)
+            }
+            Command::DeleteToLineStart => {
+                if self.read_only {
+                    return Err(AppError::Message("buffer is read-only".to_string()));
+                }
+                self.document
+                    .delete_to_line_start()
                     .map_err(|error| AppError::Message(error.to_string()))?;
                 Ok(CommandDisposition::Continue)
             }
@@ -387,7 +411,12 @@ impl AppState {
             .document
             .bytes()
             .map_err(|error| AppError::Message(error.to_string()))?;
-        let cursor_offset = self.document.selection().active.byte_offset.min(bytes.len());
+        let cursor_offset = self
+            .document
+            .selection()
+            .active
+            .byte_offset
+            .min(bytes.len());
         let Some(target_offset) = wrapped_vertical_target_offset(
             &bytes,
             cursor_offset,
@@ -434,6 +463,7 @@ fn apply_hex_scroll(state: &mut RenderState, direction: MoveCommand, total_rows:
 
 pub fn run() -> AppResult<()> {
     let args = Cli::parse_args();
+    let keybinding_profile = args.keybinding_profile();
     let config_line_ending = if args.config.is_some() {
         let config = EditorConfig::load(args.config.clone())
             .map_err(|error| AppError::Message(error.to_string()))?;
@@ -518,6 +548,7 @@ pub fn run() -> AppResult<()> {
     );
     app_state.set_hex_mode(hex_mode);
     app_state.set_read_only(read_only);
+    app_state.set_keybinding_profile(keybinding_profile);
     app_state.set_show_invisibles(args.invisibles);
     match args.wrap {
         None => {
@@ -536,11 +567,17 @@ pub fn run() -> AppResult<()> {
 
     let mut terminal = Terminal::new()?;
     let _terminal_modes = TerminalModeGuard::enter()?;
-    let event_loop = EventLoop::default();
+    let event_loop = EventLoop {
+        profile: keybinding_profile,
+        ..EventLoop::default()
+    };
     let renderer = Renderer;
     let mut render_state = RenderState::new(terminal.width, terminal.height);
     let mut flusher = WriterFlush::new(stdout());
-    let mut startup_help_message = Some(startup_help_text(app_state.is_hex_mode()));
+    let mut startup_help_message = Some(startup_help_text(
+        app_state.is_hex_mode(),
+        keybinding_profile,
+    ));
     let mut status_message: Option<String> = None;
     let mut needs_render = true;
 
@@ -563,7 +600,12 @@ pub fn run() -> AppResult<()> {
                 dirty: app_state.is_dirty(),
                 read_only,
                 encoding: app_state.status_encoding_label().to_string(),
-                line_ending: app_state.document().line_endings().indicator().label().to_string(),
+                line_ending: app_state
+                    .document()
+                    .line_endings()
+                    .indicator()
+                    .label()
+                    .to_string(),
                 bom: app_state.status_bom_label().to_string(),
                 tab_width: app_state.tab_width(),
                 wrap_column: if app_state.is_wrap_enabled() {
@@ -626,7 +668,10 @@ pub fn run() -> AppResult<()> {
         app_state.set_viewport_rows(render_state.body_height_for(chrome_rows).max(1));
         for command in commands {
             if matches!(&command, Command::ShowHelp) {
-                startup_help_message = Some(startup_help_text(app_state.is_hex_mode()));
+                startup_help_message = Some(startup_help_text(
+                    app_state.is_hex_mode(),
+                    keybinding_profile,
+                ));
                 status_message = None;
                 needs_render = true;
                 continue;
@@ -685,15 +730,38 @@ pub fn run() -> AppResult<()> {
     }
 }
 
-fn startup_help_text(hex_mode: bool) -> String {
+fn startup_help_text(hex_mode: bool, profile: KeybindingProfile) -> String {
     if hex_mode {
-        String::from(
-            "Quit: q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Help: Ctrl+H/Alt+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
-        )
-    } else {
-        String::from(
-            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+Home/Ctrl+End/PgUp/PgDn • Edit: Enter/Backspace/Delete/Tab/Shift+Tab",
-        )
+        return match profile {
+            KeybindingProfile::MacOs => String::from(
+                "Quit: q/⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Help: ⇧⌘?/Ctrl+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
+            ),
+            KeybindingProfile::Default => String::from(
+                "Quit: q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Help: Ctrl+H/Alt+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
+            ),
+        };
+    }
+
+    match profile {
+        KeybindingProfile::MacOs => String::from(
+            "Save: ⌘S/Ctrl+S • Help: ⇧⌘?/Ctrl+H • Quit: ⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: ⌘C/X/V, Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: ⌘A, Shift+Arrows/Shift+PgUp/Shift+PgDn/Shift+⌥←→/Shift+⌘←→/Shift+⌘↑↓ • Undo: ⌘Z/Ctrl+Z • Redo: ⇧⌘Z/Ctrl+Y • Toggle BOM: Ctrl+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/⌥←→/⌘←→/⌘↑↓/Ctrl+Home/Ctrl+End/PgUp/PgDn • Edit: Enter/Backspace/Delete/⌥Backspace/⌘Backspace/Ctrl+Backspace/Ctrl+U/Tab/Shift+Tab",
+        ),
+        KeybindingProfile::Default => String::from(
+            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Edit: Enter/Backspace/Delete/Ctrl+Backspace/Ctrl+U/Tab/Shift+Tab",
+        ),
+    }
+}
+
+fn unsaved_changes_message(profile: KeybindingProfile) -> String {
+    match profile {
+        KeybindingProfile::MacOs => {
+            "unsaved changes: use ⌘S or Ctrl+S to save, or Ctrl+Alt+Q/Ctrl+G/F12 to force quit"
+                .to_string()
+        }
+        KeybindingProfile::Default => {
+            "unsaved changes: use Ctrl+S to save or Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 to force quit"
+                .to_string()
+        }
     }
 }
 
@@ -719,9 +787,8 @@ fn base64_encode(input: &[u8]) -> String {
     let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
     let mut idx = 0usize;
     while idx + 3 <= input.len() {
-        let chunk = ((input[idx] as u32) << 16)
-            | ((input[idx + 1] as u32) << 8)
-            | input[idx + 2] as u32;
+        let chunk =
+            ((input[idx] as u32) << 16) | ((input[idx + 1] as u32) << 8) | input[idx + 2] as u32;
         out.push(TABLE[((chunk >> 18) & 0x3F) as usize] as char);
         out.push(TABLE[((chunk >> 12) & 0x3F) as usize] as char);
         out.push(TABLE[((chunk >> 6) & 0x3F) as usize] as char);
@@ -860,7 +927,11 @@ fn visual_rows_for_line(range: WrapLineRange, bytes: &[u8], width: usize) -> usi
     }
 }
 
-fn offset_to_wrap_line_column(ranges: &[WrapLineRange], bytes: &[u8], offset: usize) -> (usize, usize) {
+fn offset_to_wrap_line_column(
+    ranges: &[WrapLineRange],
+    bytes: &[u8],
+    offset: usize,
+) -> (usize, usize) {
     for (index, range) in ranges.iter().enumerate() {
         let is_last = index + 1 == ranges.len();
         let in_line = if is_last {
@@ -1057,9 +1128,11 @@ mod tests {
         app.execute_command(Command::Save)
             .expect("save should succeed after bom toggle");
         assert!(!app.is_dirty());
-        assert!(fs::read(&path).expect("saved file should be readable").starts_with(&[
-            0xEF, 0xBB, 0xBF
-        ]));
+        assert!(
+            fs::read(&path)
+                .expect("saved file should be readable")
+                .starts_with(&[0xEF, 0xBB, 0xBF])
+        );
 
         fs::remove_file(path).expect("fixture cleanup should succeed");
     }
@@ -1103,7 +1176,10 @@ mod tests {
         let mut app = AppState::new(document);
         app.execute_command(Command::InsertChar('\t'))
             .expect("tab indent should succeed");
-        assert_eq!(app.document().bytes().expect("bytes should be readable"), b"  a\n  b");
+        assert_eq!(
+            app.document().bytes().expect("bytes should be readable"),
+            b"  a\n  b"
+        );
     }
 
     #[test]
@@ -1113,7 +1189,10 @@ mod tests {
         let mut app = AppState::new(document);
         app.execute_command(Command::OutdentSelection)
             .expect("outdent should succeed");
-        assert_eq!(app.document().bytes().expect("bytes should be readable"), b"a\nb");
+        assert_eq!(
+            app.document().bytes().expect("bytes should be readable"),
+            b"a\nb"
+        );
     }
 
     #[test]

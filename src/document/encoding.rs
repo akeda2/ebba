@@ -168,7 +168,12 @@ fn auto_detect_plan(bytes: &[u8], options: &DetectionOptions) -> StartupPlan {
     }
 
     if let Ok(text) = std::str::from_utf8(bytes) {
-        return decoded_text_plan(DetectedEncoding::Utf8, text.to_string(), false, options.line_ending_mode);
+        return decoded_text_plan(
+            DetectedEncoding::Utf8,
+            text.to_string(),
+            false,
+            options.line_ending_mode,
+        );
     }
 
     fallback_text_plan(bytes, options.line_ending_mode)
@@ -197,7 +202,12 @@ fn forced_text_plan(
         return fallback_text_plan(bytes, line_ending_mode);
     }
     if let Ok(text) = std::str::from_utf8(bytes) {
-        return decoded_text_plan(DetectedEncoding::Utf8, text.to_string(), false, line_ending_mode);
+        return decoded_text_plan(
+            DetectedEncoding::Utf8,
+            text.to_string(),
+            false,
+            line_ending_mode,
+        );
     }
 
     fallback_text_plan(bytes, line_ending_mode)
@@ -206,7 +216,12 @@ fn forced_text_plan(
 fn utf8_bom_plan(bytes: &[u8], line_ending_mode: LineEndingMode) -> StartupPlan {
     let body = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
     if let Ok(text) = std::str::from_utf8(body) {
-        decoded_text_plan(DetectedEncoding::Utf8Bom, text.to_string(), true, line_ending_mode)
+        decoded_text_plan(
+            DetectedEncoding::Utf8Bom,
+            text.to_string(),
+            true,
+            line_ending_mode,
+        )
     } else {
         fallback_text_plan(bytes, line_ending_mode)
     }

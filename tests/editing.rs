@@ -202,3 +202,75 @@ fn page_movement_moves_more_than_single_line() {
     page.move_page_up(8, false).unwrap();
     assert_eq!(page.selection().active.byte_offset, 0);
 }
+
+#[test]
+fn delete_word_backward_removes_previous_word() {
+    let mut doc = Document::from_bytes(b"alpha beta".to_vec());
+    doc.move_document_end(false);
+    doc.delete_word_backward().unwrap();
+    assert_eq!(doc.bytes().unwrap(), b"alpha ");
+}
+
+#[test]
+fn delete_word_backward_skips_trailing_whitespace() {
+    let mut doc = Document::from_bytes(b"alpha beta   ".to_vec());
+    doc.move_document_end(false);
+    doc.delete_word_backward().unwrap();
+    assert_eq!(doc.bytes().unwrap(), b"alpha ");
+}
+
+#[test]
+fn delete_word_backward_is_unicode_aware() {
+    let mut doc = Document::from_bytes("hej värld".as_bytes().to_vec());
+    doc.move_document_end(false);
+    doc.delete_word_backward().unwrap();
+    assert_eq!(doc.bytes().unwrap(), "hej ".as_bytes());
+}
+
+#[test]
+fn delete_word_backward_deletes_selection() {
+    let mut doc = Document::from_bytes(b"hello world".to_vec());
+    doc.move_right(true).unwrap();
+    doc.move_right(true).unwrap();
+    doc.delete_word_backward().unwrap();
+    assert_eq!(doc.bytes().unwrap(), b"llo world");
+}
+
+#[test]
+fn delete_to_line_start_removes_to_logical_line_start() {
+    let mut doc = Document::from_bytes(b"first\nsecond".to_vec());
+    doc.move_document_end(false);
+    doc.delete_to_line_start().unwrap();
+    assert_eq!(doc.bytes().unwrap(), b"first\n");
+}
+
+#[test]
+fn delete_to_line_start_at_boundary_is_noop() {
+    let mut doc = Document::from_bytes(b"first\nsecond".to_vec());
+    doc.move_line_start(false).unwrap();
+    doc.delete_to_line_start().unwrap();
+    assert_eq!(doc.bytes().unwrap(), b"first\nsecond");
+}
+
+#[test]
+fn delete_to_line_start_deletes_selection_when_present() {
+    let mut doc = Document::from_bytes(b"hello world".to_vec());
+    doc.move_right(true).unwrap();
+    doc.move_right(true).unwrap();
+    doc.delete_to_line_start().unwrap();
+    assert_eq!(doc.bytes().unwrap(), b"llo world");
+}
+
+#[test]
+fn delete_word_and_line_start_participate_in_undo_redo() {
+    let mut doc = Document::from_bytes(b"alpha beta\ngamma".to_vec());
+    doc.move_document_end(false);
+    doc.delete_word_backward().unwrap();
+    doc.delete_to_line_start().unwrap();
+    assert_eq!(doc.bytes().unwrap(), b"alpha beta\n");
+
+    assert!(doc.undo().unwrap());
+    assert_eq!(doc.bytes().unwrap(), b"alpha beta\ngamma");
+    assert!(doc.redo().unwrap());
+    assert_eq!(doc.bytes().unwrap(), b"alpha beta\n");
+}

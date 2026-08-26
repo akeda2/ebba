@@ -2,10 +2,14 @@ use std::io::stdout;
 
 use crossterm::{
     cursor::{Hide, Show},
-    event::{DisableBracketedPaste, EnableBracketedPaste},
+    event::{
+        DisableBracketedPaste, EnableBracketedPaste, KeyboardEnhancementFlags,
+        PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    },
     execute,
     terminal::{
         EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode, size,
+        supports_keyboard_enhancement,
     },
 };
 
@@ -25,18 +29,32 @@ impl Terminal {
 }
 
 #[derive(Debug)]
-pub struct TerminalModeGuard;
+pub struct TerminalModeGuard {
+    keyboard_enhancement_enabled: bool,
+}
 
 impl TerminalModeGuard {
     pub fn enter() -> AppResult<Self> {
         enable_raw_mode()?;
         execute!(stdout(), EnterAlternateScreen, EnableBracketedPaste, Hide)?;
-        Ok(Self)
+        let keyboard_enhancement_enabled = supports_keyboard_enhancement().unwrap_or(false);
+        if keyboard_enhancement_enabled {
+            execute!(
+                stdout(),
+                PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+            )?;
+        }
+        Ok(Self {
+            keyboard_enhancement_enabled,
+        })
     }
 }
 
 impl Drop for TerminalModeGuard {
     fn drop(&mut self) {
+        if self.keyboard_enhancement_enabled {
+            let _ = execute!(stdout(), PopKeyboardEnhancementFlags);
+        }
         let _ = execute!(stdout(), Show, DisableBracketedPaste, LeaveAlternateScreen);
         let _ = disable_raw_mode();
     }

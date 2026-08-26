@@ -15,7 +15,9 @@ pub enum RenderMode<'a> {
         wrap_column: Option<usize>,
         show_invisibles: bool,
     },
-    Hex { bytes: &'a [u8] },
+    Hex {
+        bytes: &'a [u8],
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,7 +51,11 @@ impl RenderState {
     }
 
     pub fn ensure_cursor_visible(&mut self, cursor_row: usize, total_rows: usize) {
-        self.ensure_cursor_visible_for_body_height(cursor_row, total_rows, self.body_height().max(1));
+        self.ensure_cursor_visible_for_body_height(
+            cursor_row,
+            total_rows,
+            self.body_height().max(1),
+        );
     }
 
     pub fn clamp_scroll(&mut self, total_rows: usize) {
@@ -212,7 +218,6 @@ impl Renderer {
                     cursor: None,
                 }
             }
-
         }
     }
 

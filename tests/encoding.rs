@@ -251,5 +251,8 @@ fn line_ending_indicator_supports_cr_and_none() {
         StartupDecision::Ready(plan) => plan,
         other => panic!("expected ready plan, got {other:?}"),
     };
-    assert_eq!(none_plan.line_endings.indicator(), LineEndingIndicator::None);
+    assert_eq!(
+        none_plan.line_endings.indicator(),
+        LineEndingIndicator::None
+    );
 }

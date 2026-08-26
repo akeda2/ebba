@@ -238,7 +238,11 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
 
         let (line_index, show_number, text) = &visual_rows[visual_row];
         let gutter = if *show_number {
-            format!("{:>gutter_width$}", line_index + 1, gutter_width = gutter_width)
+            format!(
+                "{:>gutter_width$}",
+                line_index + 1,
+                gutter_width = gutter_width
+            )
         } else {
             " ".repeat(gutter_width)
         };
@@ -296,7 +300,8 @@ fn line_ending_kind(range: LineRange, bytes: &[u8]) -> Option<LineEndingKind> {
     if range.end_with_newline == range.end_no_newline {
         return None;
     }
-    if range.end_no_newline > range.start && bytes[range.end_no_newline.saturating_sub(1)] == b'\r' {
+    if range.end_no_newline > range.start && bytes[range.end_no_newline.saturating_sub(1)] == b'\r'
+    {
         return Some(LineEndingKind::Crlf);
     }
     Some(LineEndingKind::Lf)
@@ -309,7 +314,11 @@ fn line_display_end(range: LineRange, bytes: &[u8]) -> usize {
     }
 }
 
-fn decorate_line_text(content: &str, show_invisibles: bool, ending: Option<LineEndingKind>) -> String {
+fn decorate_line_text(
+    content: &str,
+    show_invisibles: bool,
+    ending: Option<LineEndingKind>,
+) -> String {
     if !show_invisibles {
         return content.to_string();
     }

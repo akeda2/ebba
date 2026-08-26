@@ -36,11 +36,12 @@ impl LineEndingStats {
                 Some((_, best_count)) if count > best_count => best = Some((kind, count)),
                 Some((existing, best_count))
                     if count == best_count
-                        && priority > match existing {
-                            LineEnding::Cr => 0,
-                            LineEnding::Lf => 1,
-                            LineEnding::Crlf => 2,
-                        } =>
+                        && priority
+                            > match existing {
+                                LineEnding::Cr => 0,
+                                LineEnding::Lf => 1,
+                                LineEnding::Crlf => 2,
+                            } =>
                 {
                     best = Some((kind, count))
                 }
