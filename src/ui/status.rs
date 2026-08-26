@@ -9,6 +9,7 @@ pub struct StatusLine {
     pub encoding: String,
     pub line_ending: String,
     pub bom: String,
+    pub tab_width: usize,
     pub wrapped_segment: Option<(usize, usize)>,
     pub wrap_column: Option<usize>,
     pub show_invisibles: bool,
@@ -27,6 +28,7 @@ impl Default for StatusLine {
             encoding: String::from("utf-8"),
             line_ending: String::from("LF"),
             bom: String::from("NO-BOM"),
+            tab_width: 2,
             wrapped_segment: None,
             wrap_column: None,
             show_invisibles: false,
@@ -62,13 +64,14 @@ impl StatusLine {
             format!("Ln {}", self.line)
         };
         let left = format!(
-            "{} [{}|{}] {}, Col {} / {} {} {} {} {} {}",
+            "{} [{}|{}] {}, Col {} / {} TAB:{} {} {} {} {} {}",
             self.filename,
             modified,
             access,
             line_label,
             self.column,
             self.total_lines,
+            self.tab_width,
             wrap,
             invisibles,
             self.encoding,

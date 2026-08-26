@@ -565,6 +565,7 @@ pub fn run() -> AppResult<()> {
                 encoding: app_state.status_encoding_label().to_string(),
                 line_ending: app_state.document().line_endings().indicator().label().to_string(),
                 bom: app_state.status_bom_label().to_string(),
+                tab_width: app_state.tab_width(),
                 wrap_column: if app_state.is_wrap_enabled() {
                     Some(app_state.wrap_column().unwrap_or(0))
                 } else {
@@ -661,9 +662,7 @@ pub fn run() -> AppResult<()> {
                     if was_copy_or_cut {
                         export_terminal_clipboard_osc52(app_state.document().clipboard());
                     }
-                    if was_cycle_tab {
-                        status_message = Some(format!("Tab width: {}", app_state.tab_width()));
-                    } else if was_toggle_bom {
+                    if was_cycle_tab || was_toggle_bom {
                         status_message = None;
                     } else if was_toggle_invisibles {
                         let mode = if app_state.show_invisibles() {
@@ -693,7 +692,7 @@ fn startup_help_text(hex_mode: bool) -> String {
         )
     } else {
         String::from(
-            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select all: Ctrl+A • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+Home/Ctrl+End/PgUp/PgDn • Extend: Shift+Arrows/Shift+PgUp/Shift+PgDn • Edit: Enter/Backspace/Delete/Tab/Shift+Tab",
+            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+Home/Ctrl+End/PgUp/PgDn • Edit: Enter/Backspace/Delete/Tab/Shift+Tab",
         )
     }
 }

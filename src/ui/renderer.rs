@@ -184,11 +184,11 @@ impl Renderer {
                     text.status_total_lines,
                 );
                 status.wrapped_segment = text.wrapped_segment;
-                let mut lines = vec![status.render(state.width as usize)];
-                lines.splice(0..0, header_lines.iter().cloned());
+                let mut lines = header_lines.clone();
                 if show_separator {
                     lines.push(header_separator_line(state.width as usize));
                 }
+                lines.push(status.render(state.width as usize));
                 lines.append(&mut text.lines);
                 RenderFrame {
                     lines,
@@ -201,11 +201,11 @@ impl Renderer {
             RenderMode::Hex { bytes } => {
                 let mut hex = self.render_hex(state, bytes, body_width, body_height);
                 status = status.with_position(state.scroll_row + 1, 1, hex.total_rows);
-                let mut lines = vec![status.render(state.width as usize)];
-                lines.splice(0..0, header_lines.iter().cloned());
+                let mut lines = header_lines.clone();
                 if show_separator {
                     lines.push(header_separator_line(state.width as usize));
                 }
+                lines.push(status.render(state.width as usize));
                 lines.append(&mut hex.lines);
                 RenderFrame {
                     lines,

@@ -221,8 +221,8 @@ fn renderer_places_transient_header_above_status() {
     );
 
     assert!(frame.lines[0].contains("Ctrl+Q quit"));
-    assert!(frame.lines[1].contains("notes.txt"));
-    assert_eq!(frame.lines[2], "-".repeat(37));
+    assert_eq!(frame.lines[1], "-".repeat(37));
+    assert!(frame.lines[2].contains("notes.txt"));
     assert_eq!(frame.cursor, Some((3, 5)));
 }
 
@@ -246,8 +246,8 @@ fn renderer_wraps_transient_header_by_width() {
 
     assert_eq!(frame.lines[0], "1234567890");
     assert_eq!(frame.lines[1], "AB");
-    assert!(!frame.lines[2].is_empty());
-    assert_eq!(frame.lines[3], "-".repeat(7));
+    assert_eq!(frame.lines[2], "-".repeat(7));
+    assert!(!frame.lines[3].is_empty());
     assert_eq!(frame.cursor, Some((4, 5)));
 }
 
