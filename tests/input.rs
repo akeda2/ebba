@@ -4,8 +4,8 @@ mod command;
 mod input;
 
 use command::{Command, MoveCommand};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use input::command_from_key_event;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use input::{command_from_event, command_from_key_event};
 
 #[test]
 fn maps_ctrl_q_to_quit() {
@@ -142,4 +142,13 @@ fn maps_tab_to_insert_char_tab() {
 fn maps_shift_tab_to_outdent_selection() {
     let key = KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT);
     assert_eq!(command_from_key_event(key), Some(Command::OutdentSelection));
+}
+
+#[test]
+fn maps_terminal_paste_payload_to_paste_text_command() {
+    let event = Event::Paste("hello".to_string());
+    assert_eq!(
+        command_from_event(event),
+        Some(Command::PasteText("hello".to_string()))
+    );
 }

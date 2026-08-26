@@ -18,7 +18,7 @@ pub enum MoveCommand {
     PageDown,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     Quit,
     ForceQuit,
@@ -36,6 +36,7 @@ pub enum Command {
     Copy,
     Cut,
     Paste,
+    PasteText(String),
     SelectAll,
     Undo,
     Redo,

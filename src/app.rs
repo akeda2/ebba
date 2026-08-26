@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::stdout;
+use std::io::{Write, stdout};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
@@ -270,6 +270,15 @@ impl AppState {
                 }
                 self.document
                     .paste_clipboard()
+                    .map_err(|error| AppError::Message(error.to_string()))?;
+                Ok(CommandDisposition::Continue)
+            }
+            Command::PasteText(text) => {
+                if self.read_only {
+                    return Err(AppError::Message("buffer is read-only".to_string()));
+                }
+                self.document
+                    .insert_text(&text)
                     .map_err(|error| AppError::Message(error.to_string()))?;
                 Ok(CommandDisposition::Continue)
             }
@@ -615,7 +624,7 @@ pub fn run() -> AppResult<()> {
         app_state.set_viewport_columns(render_state.width as usize);
         app_state.set_viewport_rows(render_state.body_height_for(chrome_rows).max(1));
         for command in commands {
-            if matches!(command, Command::ShowHelp) {
+            if matches!(&command, Command::ShowHelp) {
                 startup_help_message = Some(startup_help_text(app_state.is_hex_mode()));
                 status_message = None;
                 needs_render = true;
@@ -630,25 +639,29 @@ pub fn run() -> AppResult<()> {
                 }
             }
             if app_state.is_hex_mode()
-                && let Command::Move { direction, .. } = command
+                && let Command::Move { direction, .. } = &command
             {
                 let bytes = app_state
                     .document()
                     .bytes()
                     .map_err(|error| AppError::Message(error.to_string()))?;
-                if apply_hex_scroll(&mut render_state, direction, hex_total_rows(bytes.len())) {
+                if apply_hex_scroll(&mut render_state, *direction, hex_total_rows(bytes.len())) {
                     needs_render = true;
                 }
                 status_message = None;
                 continue;
             }
-            let was_cycle_tab = matches!(command, Command::CycleTabWidth);
-            let was_toggle_bom = matches!(command, Command::ToggleBom);
-            let was_toggle_wrap = matches!(command, Command::ToggleWrap);
-            let was_toggle_invisibles = matches!(command, Command::ToggleInvisibles);
+            let was_cycle_tab = matches!(&command, Command::CycleTabWidth);
+            let was_toggle_bom = matches!(&command, Command::ToggleBom);
+            let was_toggle_wrap = matches!(&command, Command::ToggleWrap);
+            let was_toggle_invisibles = matches!(&command, Command::ToggleInvisibles);
+            let was_copy_or_cut = matches!(&command, Command::Copy | Command::Cut);
             match app_state.execute_command(command) {
                 Ok(CommandDisposition::Exit) => return Ok(()),
                 Ok(CommandDisposition::Continue) => {
+                    if was_copy_or_cut {
+                        export_terminal_clipboard_osc52(app_state.document().clipboard());
+                    }
                     if was_cycle_tab {
                         status_message = Some(format!("Tab width: {}", app_state.tab_width()));
                     } else if was_toggle_bom {
@@ -691,9 +704,62 @@ fn startup_help_text(hex_mode: bool) -> String {
         )
     } else {
         String::from(
-            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V • Select all: Ctrl+A • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+Home/Ctrl+End/PgUp/PgDn • Extend: Shift+Arrows/Shift+PgUp/Shift+PgDn • Edit: Enter/Backspace/Delete/Tab/Shift+Tab",
+            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select all: Ctrl+A • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+Home/Ctrl+End/PgUp/PgDn • Extend: Shift+Arrows/Shift+PgUp/Shift+PgDn • Edit: Enter/Backspace/Delete/Tab/Shift+Tab",
         )
     }
+}
+
+fn export_terminal_clipboard_osc52(text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    if !std::env::var_os("TERM").is_some_and(|term| term != "dumb") {
+        return;
+    }
+    let encoded = base64_encode(text.as_bytes());
+    let sequence = format!("\x1b]52;c;{encoded}\x07");
+    let _ = std::io::stdout().write_all(sequence.as_bytes());
+    let _ = std::io::stdout().flush();
+}
+
+fn base64_encode(input: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    if input.is_empty() {
+        return String::new();
+    }
+
+    let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
+    let mut idx = 0usize;
+    while idx + 3 <= input.len() {
+        let chunk = ((input[idx] as u32) << 16)
+            | ((input[idx + 1] as u32) << 8)
+            | input[idx + 2] as u32;
+        out.push(TABLE[((chunk >> 18) & 0x3F) as usize] as char);
+        out.push(TABLE[((chunk >> 12) & 0x3F) as usize] as char);
+        out.push(TABLE[((chunk >> 6) & 0x3F) as usize] as char);
+        out.push(TABLE[(chunk & 0x3F) as usize] as char);
+        idx += 3;
+    }
+
+    match input.len() - idx {
+        1 => {
+            let chunk = (input[idx] as u32) << 16;
+            out.push(TABLE[((chunk >> 18) & 0x3F) as usize] as char);
+            out.push(TABLE[((chunk >> 12) & 0x3F) as usize] as char);
+            out.push('=');
+            out.push('=');
+        }
+        2 => {
+            let chunk = ((input[idx] as u32) << 16) | ((input[idx + 1] as u32) << 8);
+            out.push(TABLE[((chunk >> 18) & 0x3F) as usize] as char);
+            out.push(TABLE[((chunk >> 12) & 0x3F) as usize] as char);
+            out.push(TABLE[((chunk >> 6) & 0x3F) as usize] as char);
+            out.push('=');
+        }
+        _ => {}
+    }
+
+    out
 }
 
 #[derive(Clone, Copy)]
@@ -967,6 +1033,18 @@ mod tests {
             .execute_command(Command::ShowHelp)
             .expect("show help should succeed");
         assert_eq!(outcome, CommandDisposition::Continue);
+    }
+
+    #[test]
+    fn paste_text_inserts_terminal_payload() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        app.execute_command(Command::PasteText("hello".to_string()))
+            .expect("paste text should succeed");
+        assert_eq!(
+            app.document().bytes().expect("bytes should be readable"),
+            b"hello"
+        );
     }
 
     #[test]

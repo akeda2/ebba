@@ -57,7 +57,7 @@ where
 pub fn command_from_event(event: Event) -> Option<Command> {
     match event {
         Event::Key(key_event) => command_from_key_event(key_event),
-        Event::Paste(_) => Some(Command::Paste),
+        Event::Paste(text) => Some(Command::PasteText(text)),
         _ => None,
     }
 }

@@ -2,7 +2,17 @@
 
 `ebba` is a minimal terminal editor.
 
-Ebba is inspired by **fresh**, but is a minimal implementation that keeps the same navigation and clipboard-style shortcuts.
+Written in rust, Ebba is inspired by **fresh**, but is a minimal implementation that keeps the same navigation and clipboard-style shortcuts.
+
+## Features
+- Modern style clipboarding: `ctrl+c/v/x/a`
+- Terminal copy/paste: `ctrl+shift+c/v`
+- Arrow key/pgup/pgdn/home/end navigation.
+- Mandatory line numbering.
+- Multi-line tab indentation.
+- Multiple keybindings for exiting.
+- Hotkey for showing invisible characters and line endings.
+- Read only hex mode fallback for binary files.
 
 ## Installation
 
@@ -91,6 +101,7 @@ ebba README.md --wrap 80 --invisibles
 - Copy: `Ctrl+C`
 - Cut: `Ctrl+X`
 - Paste: `Ctrl+V`
+- Terminal clipboard copy/paste: `Ctrl+Shift+C`, `Ctrl+Shift+V`
 - Select all: `Ctrl+A`
 
 ### Undo/redo
