@@ -350,7 +350,7 @@ fn columnize_segment(segment: &str, width: usize) -> Vec<String> {
     for row in 0..rows {
         let mut line = String::new();
         for col in 0..cols {
-            let idx = row * cols + col;
+            let idx = col * rows + row;
             if idx >= items.len() {
                 break;
             }
