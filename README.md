@@ -1,105 +1,127 @@
 # EBBA
 
-`ebba` is a **minimal terminal editor** for text/binary file workflows.  
-Current scope is Linux-first and intentionally small.
+`ebba` is a minimal terminal editor.
 
-## MVP scope and constraints
+Ebba is inspired by **fresh**, but is a minimal implementation that keeps the same navigation and clipboard-style shortcuts.
 
-- Inspired by the **fresh editor** - keybindings, ctrl+c/v etc.
-- Linux-first development/testing target for now.
-- Startup automatic or manual mode selection for text vs binary-oriented views.
-- Core editing primitives and rendering components are implemented/tested; app wiring remains intentionally minimal.
+## Installation
 
-## Run
+### 1) Build a release binary
 
 ```bash
-cargo run -- [FILE] [--encoding ENCODING] [--line-ending <lf|crlf>] [--text|--binary] [--wrap [COLUMN]] [--invisibles] [--config PATH]
+cargo build --release
 ```
+
+Binary path:
+
+```text
+target/release/ebba
+```
+
+### 2) Install with Cargo
+
+```bash
+cargo install --path .
+```
+
+### 3) Install via project script
+
+```bash
+./inst.sh
+```
+
+`inst.sh` currently runs `cargo install --path .`, sudo-copies `target/release/ebba` to `/usr/local/bin/ebba` for all users, and does optional `gb` integration if available.
+
+## Usage
+
+```bash
+ebba FILE [OPTIONS]
+```
+
+Example:
+
+```bash
+ebba README.md --wrap 80 --invisibles
+```
+
+## Startup options
+
+- `FILE`  
+  Path to the file to open.
+- `--encoding <ENCODING>`  
+  Save encoding override: `utf-8`, `utf-8-bom`, `utf-16le-bom`, `utf-16be-bom`.
+- `--line-ending <lf|crlf>`  
+  Force line endings on save (otherwise preserve mode).
+- `--text`  
+  Force text startup mode.
+- `--binary`  
+  Force binary fallback mode (read-only hex view).
+- `--wrap [COLUMN]`  
+  Enable wrapping; optional fixed wrap column (for example `--wrap 80`).
+- `--invisibles`  
+  Show invisible characters (space `·`, LF `␊`, CRLF `␍`).
+- `--config <PATH>`  
+  Load YAML config from explicit path.
 
 `--text` and `--binary` are mutually exclusive.
 
-## Implemented CLI options
+## Keybindings
 
-- `--encoding ENCODING`  
-  Save-encoding override. Accepted labels: `utf-8`, `utf-8-bom`, `utf-16le` (`utf-16le-bom`), `utf-16be` (`utf-16be-bom`).
-- `--line-ending <lf|crlf>`  
-  Save line-ending override.
-- `--text`  
-  Force text startup path; if bytes are not safely decodable, fallback is byte-preserving text mode.
-- `--binary`  
-  Force hex read-only startup mode.
-- `--config PATH`  
-  Load YAML config from an explicit path.
-- `--wrap [COLUMN]`  
-  Enable line wrapping at startup (default is off).  
-  Example: `--wrap 80` wraps at 80 text columns (line-number gutter excluded).
-- `--invisibles`  
-  Show invisible characters at startup (spaces as `·`, LF as `␊`, CRLF as `␍`).
+### Core
 
-## Rendering behavior in MVP
+- Save: `Ctrl+S`
+- Help: `Ctrl+H`, `Alt+H`
+- Quit: `Ctrl+Q`, `Alt+Q`, `F10`
+- Force quit: `Ctrl+Alt+Q`, `Alt+Shift+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, `F12`
 
-- A status line is rendered on the **top row**.
-- Text rendering always includes a **mandatory line-number gutter**.
+### Editing
 
-## Shortcuts and quit behavior
+- Insert newline: `Enter`
+- Backspace: `Backspace`
+- Delete forward: `Delete`
+- Insert tab / indent selection: `Tab`
+- Outdent selection: `Shift+Tab`
 
-Current input mapping includes:
+### Clipboard and selection
 
-- `Ctrl+S` save
-- `Ctrl+Q`, `Alt+Q`, or `F10` quit
-- `Ctrl+Alt+Q`, `Alt+Shift+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, or `F12` force-quit
-- `Ctrl+W` toggle line wrap on/off
-- `Ctrl+K` or `Alt+I` toggle invisible characters on/off
-- `Ctrl+C` copy, `Ctrl+X` cut, `Ctrl+V` paste, `Ctrl+A` select-all
-- `Ctrl+Z` undo, `Ctrl+Y` / `Ctrl+Shift+Z` redo
+- Copy: `Ctrl+C`
+- Cut: `Ctrl+X`
+- Paste: `Ctrl+V`
+- Select all: `Ctrl+A`
 
-Quit refuses to exit on unsaved changes; force-quit exits immediately.
+### Undo/redo
 
-## Encoding/binary behavior
+- Undo: `Ctrl+Z`
+- Redo: `Ctrl+Y`, `Ctrl+Shift+Z`
 
-Startup detection supports:
+### Toggles
 
-- decoded text (`utf-8`, `utf-8-bom`, `utf-16le`, `utf-16be` when decodable)
-- byte-preserving fallback text for uncertain/non-UTF8 data
-- hex read-only mode for binary-classified data (or when forced via `--binary`)
+- Toggle BOM: `Ctrl+B`, `Alt+B`, `Ctrl+Shift+B`
+- Toggle tab width (2 → 4 → 8): `Ctrl+T`
+- Toggle wrap: `Ctrl+W`
+- Toggle invisibles: `Ctrl+K`, `Alt+I`
 
-When no conversion override is requested, unknown 8-bit content is saved in preserve-bytes mode.
+### Navigation
 
-## Large-file and confirmation notes
+- Cursor move: `←`, `→`, `↑`, `↓`
+- Word move: `Ctrl+←`, `Ctrl+→`
+- Line boundaries: `Home`, `End`
+- Document boundaries: `Ctrl+Home`, `Ctrl+End`
+- Page move: `PageUp`, `PageDown`
 
-- Startup policy can return “requires confirmation” for:
-  - large files above the MVP threshold (64 MiB in app startup policy)
-  - non-resynchronizable encodings (UTF-16 BOM variants)
-- Current app startup surfaces this decision via startup messages; interactive confirmation UX is not wired yet.
+### Extend selection
 
-## Configuration
+- Extend with arrows: `Shift+←`, `Shift+→`, `Shift+↑`, `Shift+↓`
+- Extend by page: `Shift+PageUp`, `Shift+PageDown`
+- Extend with document boundaries: `Ctrl+Shift+Home`, `Ctrl+Shift+End`
 
-`EditorConfig::load` resolves config paths in this order:
+### Hex mode notes
 
-1. explicit `--config PATH` override
-2. `$XDG_CONFIG_HOME/ebba/config.yaml`
-3. `~/.config/ebba/config.yaml`
-
-Missing config file => defaults. Invalid YAML/values => typed errors.
-
-> Note: current `app::run` only applies config when `--config` is passed.
-
-YAML structure overview:
-
-```yaml
-indentation:
-  tab_width: 4
-  indent_width: 4
-  use_tabs: false
-default_line_ending: lf # lf|crlf
-theme:
-  foreground: "#d4d4d4"
-  background: "#1e1e1e"
-keybindings:
-  save: "Ctrl+S"
-  quit: "Ctrl+Q"
-```
+- Opened via binary detection or `--binary`.
+- Read-only.
+- Scroll uses: `↑`, `↓`, `PageUp`, `PageDown`, `Home`, `End`.
+- Quit also accepts plain `q`/`Q` in addition to global quit keys.
 
 ## License
 
-This project is licensed under **GPL-2.0-only** (`LICENSE`, SPDX: `GPL-2.0-only`).
+GPL-2.0-only. See `LICENSE`.

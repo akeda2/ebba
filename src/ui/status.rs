@@ -9,6 +9,7 @@ pub struct StatusLine {
     pub encoding: String,
     pub line_ending: String,
     pub bom: String,
+    pub wrapped_segment: Option<(usize, usize)>,
     pub wrap_column: Option<usize>,
     pub show_invisibles: bool,
     pub message: Option<String>,
@@ -26,6 +27,7 @@ impl Default for StatusLine {
             encoding: String::from("utf-8"),
             line_ending: String::from("LF"),
             bom: String::from("NO-BOM"),
+            wrapped_segment: None,
             wrap_column: None,
             show_invisibles: false,
             message: Some(String::from("ready")),
@@ -54,12 +56,17 @@ impl StatusLine {
         } else {
             "INV:OFF"
         };
+        let line_label = if let Some((segment, total)) = self.wrapped_segment {
+            format!("Ln {} ({}/{})", self.line, segment, total)
+        } else {
+            format!("Ln {}", self.line)
+        };
         let left = format!(
-            "{} [{}|{}] Ln {}, Col {} / {} {} {} {} {} {}",
+            "{} [{}|{}] {}, Col {} / {} {} {} {} {} {}",
             self.filename,
             modified,
             access,
-            self.line,
+            line_label,
             self.column,
             self.total_lines,
             wrap,

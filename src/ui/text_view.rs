@@ -27,6 +27,10 @@ pub struct TextRenderOutput {
     pub cursor_line: usize,
     pub cursor_column: usize,
     pub total_lines: usize,
+    pub status_line: usize,
+    pub status_column: usize,
+    pub status_total_lines: usize,
+    pub wrapped_segment: Option<(usize, usize)>,
     pub selection_spans: Vec<Option<SelectionSpan>>,
 }
 
@@ -128,6 +132,10 @@ fn render_unwrapped(document: &Document, viewport: TextViewport) -> TextRenderOu
         cursor_line,
         cursor_column,
         total_lines,
+        status_line: cursor_line,
+        status_column: cursor_column,
+        status_total_lines: total_lines,
+        wrapped_segment: None,
         selection_spans,
     }
 }
@@ -152,6 +160,8 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
     let mut visual_rows: Vec<(usize, bool, String)> = Vec::new();
     let mut cursor_visual_row = 0usize;
     let mut cursor_col = gutter_width + 1;
+    let mut cursor_segment = 1usize;
+    let mut cursor_segment_total = 1usize;
     let mut visual_index = 0usize;
 
     for (line_index, range) in ranges.iter().copied().enumerate() {
@@ -164,9 +174,13 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
 
         for (segment_index, segment) in segments.iter().enumerate() {
             if line_index == cursor_line {
-                let is_target = cursor_column < segment.end_column || segment_index == last_segment;
+                let is_target = (cursor_column >= segment.start_column
+                    && cursor_column < segment.end_column)
+                    || (segment_index == last_segment && cursor_column >= segment.end_column);
                 if is_target {
                     cursor_visual_row = visual_index;
+                    cursor_segment = segment_index + 1;
+                    cursor_segment_total = segments.len();
                     let segment_width = segment.end_column.saturating_sub(segment.start_column);
                     let relative = cursor_column
                         .saturating_sub(segment.start_column)
@@ -242,6 +256,14 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
         cursor_line: cursor_visual_row,
         cursor_column: cursor_col.saturating_sub(gutter_width + 1),
         total_lines: total_rows,
+        status_line: cursor_line,
+        status_column: cursor_column,
+        status_total_lines: ranges.len(),
+        wrapped_segment: if cursor_segment_total > 1 {
+            Some((cursor_segment, cursor_segment_total))
+        } else {
+            None
+        },
         selection_spans,
     }
 }

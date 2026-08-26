@@ -179,10 +179,11 @@ impl Renderer {
                     show_invisibles,
                 );
                 status = status.with_position(
-                    text.cursor_line + 1,
-                    text.cursor_column + 1,
-                    text.total_lines,
+                    text.status_line + 1,
+                    text.status_column + 1,
+                    text.status_total_lines,
                 );
+                status.wrapped_segment = text.wrapped_segment;
                 let mut lines = vec![status.render(state.width as usize)];
                 lines.splice(0..0, header_lines.iter().cloned());
                 if show_separator {

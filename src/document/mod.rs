@@ -171,6 +171,16 @@ impl Document {
         self.preferred_column = None;
     }
 
+    pub fn move_to_byte_offset(&mut self, byte_offset: usize, extend: bool) {
+        let target = byte_offset.min(self.tree.len());
+        if extend {
+            self.selection.set_active(target);
+        } else {
+            self.selection = Selection::caret(target);
+        }
+        self.preferred_column = None;
+    }
+
     pub fn select_all(&mut self) {
         self.history.flush_pending();
         let end = self.tree.len();

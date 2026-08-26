@@ -262,6 +262,36 @@ fn renderer_columnizes_bulleted_header_segments() {
 }
 
 #[test]
+fn wrapped_status_shows_logical_line_and_wrap_segment() {
+    let mut doc = Document::from_bytes(b"abcdefghij\nx".to_vec());
+    doc.move_right(false).expect("move should succeed");
+    doc.move_right(false).expect("move should succeed");
+    doc.move_right(false).expect("move should succeed");
+    doc.move_right(false).expect("move should succeed");
+    doc.move_right(false).expect("move should succeed");
+    let mut state = RenderState::new(80, 4);
+    let frame = Renderer.render(
+        &mut state,
+        RenderRequest {
+            mode: RenderMode::Text {
+                document: &doc,
+                wrap: true,
+                wrap_column: Some(4),
+                show_invisibles: false,
+            },
+            status: StatusLine::default(),
+            header_message: None,
+        },
+    );
+
+    assert!(
+        frame.lines[0].contains("Ln 1 (2/3)"),
+        "status line: {}",
+        frame.lines[0]
+    );
+}
+
+#[test]
 fn selection_is_visually_highlighted() {
     let mut doc = Document::from_bytes(b"hello world".to_vec());
     doc.extend_selection_to(2);

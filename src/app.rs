@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::stdout;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
     cli::Cli,
@@ -38,6 +39,7 @@ pub struct AppState {
     hex_mode: bool,
     tab_width: usize,
     viewport_rows: usize,
+    viewport_columns: usize,
     wrap_enabled: bool,
     wrap_column: Option<usize>,
     show_invisibles: bool,
@@ -61,6 +63,7 @@ impl AppState {
             hex_mode: false,
             tab_width: 2,
             viewport_rows: 20,
+            viewport_columns: 80,
             wrap_enabled: false,
             wrap_column: None,
             show_invisibles: false,
@@ -105,6 +108,10 @@ impl AppState {
 
     pub fn set_viewport_rows(&mut self, rows: usize) {
         self.viewport_rows = rows.max(1);
+    }
+
+    pub fn set_viewport_columns(&mut self, columns: usize) {
+        self.viewport_columns = columns.max(1);
     }
 
     pub fn set_show_invisibles(&mut self, show: bool) {
@@ -289,6 +296,18 @@ impl AppState {
                 Ok(CommandDisposition::Continue)
             }
             Command::Move { direction, extend } => {
+                if self.wrap_enabled
+                    && matches!(
+                        direction,
+                        MoveCommand::Up
+                            | MoveCommand::Down
+                            | MoveCommand::PageUp
+                            | MoveCommand::PageDown
+                    )
+                    && self.handle_wrapped_vertical_move(direction, extend)?
+                {
+                    return Ok(CommandDisposition::Continue);
+                }
                 match direction {
                     MoveCommand::Left | MoveCommand::WordLeft => self
                         .document
@@ -340,6 +359,40 @@ impl AppState {
         } else {
             "NO-BOM"
         }
+    }
+
+    fn handle_wrapped_vertical_move(
+        &mut self,
+        direction: MoveCommand,
+        extend: bool,
+    ) -> AppResult<bool> {
+        let delta = match direction {
+            MoveCommand::Up => -1isize,
+            MoveCommand::Down => 1isize,
+            MoveCommand::PageUp => -(self.viewport_rows as isize),
+            MoveCommand::PageDown => self.viewport_rows as isize,
+            _ => return Ok(false),
+        };
+
+        let bytes = self
+            .document
+            .bytes()
+            .map_err(|error| AppError::Message(error.to_string()))?;
+        let cursor_offset = self.document.selection().active.byte_offset.min(bytes.len());
+        let Some(target_offset) = wrapped_vertical_target_offset(
+            &bytes,
+            cursor_offset,
+            self.viewport_columns,
+            self.wrap_column,
+            delta,
+        ) else {
+            return Ok(false);
+        };
+        if target_offset == cursor_offset {
+            return Ok(true);
+        }
+        self.document.move_to_byte_offset(target_offset, extend);
+        Ok(true)
     }
 }
 
@@ -559,6 +612,7 @@ pub fn run() -> AppResult<()> {
             )
             .len()
             + usize::from(startup_help_message.is_some());
+        app_state.set_viewport_columns(render_state.width as usize);
         app_state.set_viewport_rows(render_state.body_height_for(chrome_rows).max(1));
         for command in commands {
             if matches!(command, Command::ShowHelp) {
@@ -640,6 +694,159 @@ fn startup_help_text(hex_mode: bool) -> String {
             "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V • Select all: Ctrl+A • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+Home/Ctrl+End/PgUp/PgDn • Extend: Shift+Arrows/Shift+PgUp/Shift+PgDn • Edit: Enter/Backspace/Delete/Tab/Shift+Tab",
         )
     }
+}
+
+#[derive(Clone, Copy)]
+struct WrapLineRange {
+    start: usize,
+    end_no_newline: usize,
+    end_with_newline: usize,
+}
+
+fn wrapped_vertical_target_offset(
+    bytes: &[u8],
+    cursor_offset: usize,
+    viewport_width: usize,
+    wrap_column: Option<usize>,
+    delta_rows: isize,
+) -> Option<usize> {
+    let ranges = wrap_line_ranges(bytes);
+    if ranges.is_empty() {
+        return Some(0);
+    }
+
+    let total_lines = ranges.len().max(1);
+    let gutter_width = 4usize.max(total_lines.to_string().len());
+    let viewport_text_width = viewport_width.saturating_sub(gutter_width + 1).max(1);
+    let text_width = wrap_column
+        .filter(|column| *column > 0)
+        .map(|column| column.min(viewport_text_width))
+        .unwrap_or(viewport_text_width);
+
+    let (line_index, column) = offset_to_wrap_line_column(&ranges, bytes, cursor_offset);
+    let mut row_prefix = 0usize;
+    for range in ranges.iter().take(line_index) {
+        row_prefix += visual_rows_for_line(*range, bytes, text_width);
+    }
+    let visual_in_line = column / text_width;
+    let visual_column = column % text_width;
+    let current_global_row = row_prefix + visual_in_line;
+
+    let total_rows: usize = ranges
+        .iter()
+        .map(|range| visual_rows_for_line(*range, bytes, text_width))
+        .sum();
+    let max_row = total_rows.saturating_sub(1) as isize;
+    let target_row = (current_global_row as isize + delta_rows).clamp(0, max_row) as usize;
+
+    let mut running = 0usize;
+    for range in ranges {
+        let rows = visual_rows_for_line(range, bytes, text_width);
+        if target_row < running + rows {
+            let row_in_line = target_row - running;
+            let line_width = line_display_width(range, bytes);
+            let target_column = (row_in_line * text_width + visual_column).min(line_width);
+            return Some(line_column_to_offset(range, bytes, target_column));
+        }
+        running += rows;
+    }
+
+    Some(bytes.len())
+}
+
+fn wrap_line_ranges(bytes: &[u8]) -> Vec<WrapLineRange> {
+    let mut ranges = Vec::new();
+    let mut start = 0usize;
+
+    for (index, byte) in bytes.iter().enumerate() {
+        if *byte == b'\n' {
+            ranges.push(WrapLineRange {
+                start,
+                end_no_newline: index,
+                end_with_newline: index + 1,
+            });
+            start = index + 1;
+        }
+    }
+
+    ranges.push(WrapLineRange {
+        start,
+        end_no_newline: bytes.len(),
+        end_with_newline: bytes.len(),
+    });
+    ranges
+}
+
+fn line_display_end(range: WrapLineRange, bytes: &[u8]) -> usize {
+    if range.end_with_newline > range.end_no_newline
+        && range.end_no_newline > range.start
+        && bytes[range.end_no_newline.saturating_sub(1)] == b'\r'
+    {
+        return range.end_no_newline.saturating_sub(1);
+    }
+    range.end_no_newline
+}
+
+fn line_display_width(range: WrapLineRange, bytes: &[u8]) -> usize {
+    let start = range.start;
+    let end = line_display_end(range, bytes);
+    let slice = &bytes[start..end];
+    match std::str::from_utf8(slice) {
+        Ok(text) => UnicodeWidthStr::width(text),
+        Err(_) => slice.len(),
+    }
+}
+
+fn visual_rows_for_line(range: WrapLineRange, bytes: &[u8], width: usize) -> usize {
+    let line_width = line_display_width(range, bytes);
+    if line_width == 0 {
+        1
+    } else {
+        line_width.div_ceil(width)
+    }
+}
+
+fn offset_to_wrap_line_column(ranges: &[WrapLineRange], bytes: &[u8], offset: usize) -> (usize, usize) {
+    for (index, range) in ranges.iter().enumerate() {
+        let is_last = index + 1 == ranges.len();
+        let in_line = if is_last {
+            offset <= range.end_with_newline
+        } else {
+            offset < range.end_with_newline
+        };
+        if !in_line {
+            continue;
+        }
+        let clamped_end = offset.min(line_display_end(*range, bytes));
+        let slice = &bytes[range.start..clamped_end];
+        let width = match std::str::from_utf8(slice) {
+            Ok(text) => UnicodeWidthStr::width(text),
+            Err(_) => slice.len(),
+        };
+        return (index, width);
+    }
+    (ranges.len().saturating_sub(1), 0)
+}
+
+fn line_column_to_offset(range: WrapLineRange, bytes: &[u8], target_column: usize) -> usize {
+    let start = range.start;
+    let end = line_display_end(range, bytes);
+    let slice = &bytes[start..end];
+    let Ok(text) = std::str::from_utf8(slice) else {
+        return start + target_column.min(slice.len());
+    };
+
+    let mut used = 0usize;
+    let mut byte_offset = 0usize;
+    for (idx, ch) in text.char_indices() {
+        let width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if used + width > target_column {
+            break;
+        }
+        used += width;
+        byte_offset = idx + ch.len_utf8();
+    }
+    start + byte_offset
 }
 
 #[cfg(test)]
@@ -869,6 +1076,72 @@ mod tests {
         let line_offset = one_line.document().selection().active.byte_offset;
 
         assert!(page_offset > line_offset);
+    }
+
+    #[test]
+    fn wrapped_move_down_advances_within_single_logical_line() {
+        let mut app = AppState::new(Document::from_bytes(b"abcdefghijklmnop".to_vec()));
+        app.set_wrap_enabled(true);
+        app.set_wrap_column(Some(4));
+        app.set_viewport_columns(20);
+
+        let start = app.document().selection().active.byte_offset;
+        app.execute_command(Command::Move {
+            direction: MoveCommand::Down,
+            extend: false,
+        })
+        .expect("wrapped down should succeed");
+        let after_down = app.document().selection().active.byte_offset;
+        assert!(after_down > start);
+
+        app.execute_command(Command::Move {
+            direction: MoveCommand::Up,
+            extend: false,
+        })
+        .expect("wrapped up should succeed");
+        let after_up = app.document().selection().active.byte_offset;
+        assert_eq!(after_up, start);
+
+        app.execute_command(Command::InsertChar('Z'))
+            .expect("insert on wrapped row should succeed");
+        assert!(
+            app.document()
+                .bytes()
+                .expect("bytes should be readable")
+                .contains(&b'Z')
+        );
+    }
+
+    #[test]
+    fn wrapped_move_down_crosses_visual_rows_before_next_logical_line() {
+        let mut app = AppState::new(Document::from_bytes(b"abcdefghij\nxy".to_vec()));
+        app.set_wrap_enabled(true);
+        app.set_wrap_column(Some(4));
+        app.set_viewport_columns(20);
+
+        app.execute_command(Command::Move {
+            direction: MoveCommand::Down,
+            extend: false,
+        })
+        .expect("first wrapped down should succeed");
+        let first = app.document().selection().active.byte_offset;
+        assert_eq!(first, 4);
+
+        app.execute_command(Command::Move {
+            direction: MoveCommand::Down,
+            extend: false,
+        })
+        .expect("second wrapped down should succeed");
+        let second = app.document().selection().active.byte_offset;
+        assert_eq!(second, 8);
+
+        app.execute_command(Command::Move {
+            direction: MoveCommand::Down,
+            extend: false,
+        })
+        .expect("third wrapped down should succeed");
+        let third = app.document().selection().active.byte_offset;
+        assert_eq!(third, 11);
     }
 
     #[test]
