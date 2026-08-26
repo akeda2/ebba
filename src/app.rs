@@ -31,6 +31,9 @@ pub enum CommandDisposition {
 pub struct AppState {
     document: Document,
     save_overrides: SaveOverrides,
+    current_save_encoding: SaveEncoding,
+    baseline_save_encoding: SaveEncoding,
+    format_dirty: bool,
     read_only: bool,
     hex_mode: bool,
     tab_width: usize,
@@ -46,9 +49,14 @@ impl AppState {
     }
 
     pub fn with_save_overrides(document: Document, save_overrides: SaveOverrides) -> Self {
+        let detected_encoding = SaveEncoding::from_detected(document.detected_encoding());
+        let current_save_encoding = save_overrides.encoding.unwrap_or(detected_encoding);
         Self {
             document,
             save_overrides,
+            current_save_encoding,
+            baseline_save_encoding: current_save_encoding,
+            format_dirty: false,
             read_only: false,
             hex_mode: false,
             tab_width: 2,
@@ -107,10 +115,14 @@ impl AppState {
         self.show_invisibles
     }
 
+    pub fn is_dirty(&self) -> bool {
+        self.document.is_dirty() || self.format_dirty
+    }
+
     pub fn execute_command(&mut self, command: Command) -> AppResult<CommandDisposition> {
         match command {
             Command::Quit => {
-                if self.document.can_quit() {
+                if self.document.can_quit() && !self.format_dirty {
                     Ok(CommandDisposition::Exit)
                 } else {
                     Err(AppError::Message(
@@ -126,8 +138,13 @@ impl AppState {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
                 self.document
-                    .save(self.save_overrides)
+                    .save(SaveOverrides {
+                        encoding: Some(self.current_save_encoding),
+                        line_ending_mode: self.save_overrides.line_ending_mode,
+                    })
                     .map_err(|error| AppError::Message(error.to_string()))?;
+                self.baseline_save_encoding = self.current_save_encoding;
+                self.format_dirty = false;
                 Ok(CommandDisposition::Continue)
             }
             Command::InsertChar(ch) => {
@@ -156,6 +173,28 @@ impl AppState {
                     4 => 8,
                     _ => 2,
                 };
+                Ok(CommandDisposition::Continue)
+            }
+            Command::ToggleBom => {
+                if self.read_only {
+                    return Err(AppError::Message("buffer is read-only".to_string()));
+                }
+                if self.document.detected_encoding() == crate::document::encoding::DetectedEncoding::Unknown8Bit
+                    && !self
+                        .save_overrides
+                        .encoding
+                        .is_some_and(SaveEncoding::is_utf8_family)
+                {
+                    return Err(AppError::Message(
+                        "BOM toggle is disabled for unknown-8bit files unless --encoding utf-8 or utf-8-bom is set"
+                            .to_string(),
+                    ));
+                }
+                let toggled = self.current_save_encoding.toggled_bom().ok_or_else(|| {
+                    AppError::Message("BOM toggle is unavailable for this encoding".to_string())
+                })?;
+                self.current_save_encoding = toggled;
+                self.format_dirty = self.current_save_encoding != self.baseline_save_encoding;
                 Ok(CommandDisposition::Continue)
             }
             Command::ToggleWrap => {
@@ -287,6 +326,18 @@ impl AppState {
                 };
                 Ok(CommandDisposition::Continue)
             }
+        }
+    }
+
+    pub fn status_encoding_label(&self) -> &'static str {
+        self.current_save_encoding.encoding_label()
+    }
+
+    pub fn status_bom_label(&self) -> &'static str {
+        if self.current_save_encoding.has_bom() {
+            "BOM"
+        } else {
+            "NO-BOM"
         }
     }
 }
@@ -426,15 +477,16 @@ pub fn run() -> AppResult<()> {
     let renderer = Renderer;
     let mut render_state = RenderState::new(terminal.width, terminal.height);
     let mut flusher = WriterFlush::new(stdout());
-    let mut status_message = if app_state.is_hex_mode() {
+    let mut startup_help_message = if app_state.is_hex_mode() {
         Some(String::from(
             "q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • ↑/↓/PgUp/PgDn/Home/End scroll • PRESERVE = keep existing line endings",
         ))
     } else {
         Some(String::from(
-            "Ctrl+Q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • Ctrl+T tab • Ctrl+W wrap • Ctrl+K/Alt+I invisibles • PRESERVE = keep existing line endings",
+            "Ctrl+Q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • Ctrl+B/Alt+B/Ctrl+Shift+B BOM • Ctrl+T tab • Ctrl+W wrap • Ctrl+K/Alt+I invisibles",
         ))
     };
+    let mut status_message: Option<String> = None;
     let mut needs_render = true;
 
     loop {
@@ -453,19 +505,11 @@ pub fn run() -> AppResult<()> {
                 .unwrap_or_else(|| String::from("[No Name]"));
             let status = StatusLine {
                 filename,
-                dirty: app_state.document().is_dirty(),
+                dirty: app_state.is_dirty(),
                 read_only,
-                encoding: encoding_override
-                    .map(|enc| enc.to_string())
-                    .unwrap_or_else(|| "utf-8".to_string()),
-                line_ending: line_ending_override
-                    .map(|mode| match mode {
-                        LineEndingMode::Preserve => "PRESERVE",
-                        LineEndingMode::Lf => "LF",
-                        LineEndingMode::Crlf => "CRLF",
-                    })
-                    .map(str::to_string)
-                    .unwrap_or_else(|| "PRESERVE".to_string()),
+                encoding: app_state.status_encoding_label().to_string(),
+                line_ending: app_state.document().line_endings().indicator().label().to_string(),
+                bom: app_state.status_bom_label().to_string(),
                 wrap_column: if app_state.is_wrap_enabled() {
                     Some(app_state.wrap_column().unwrap_or(0))
                 } else {
@@ -486,6 +530,7 @@ pub fn run() -> AppResult<()> {
                     RenderRequest {
                         mode: RenderMode::Hex { bytes: &bytes },
                         status,
+                        header_message: startup_help_message.as_deref(),
                     },
                 )
             } else {
@@ -499,6 +544,7 @@ pub fn run() -> AppResult<()> {
                             show_invisibles: app_state.show_invisibles(),
                         },
                         status,
+                        header_message: startup_help_message.as_deref(),
                     },
                 )
             };
@@ -513,8 +559,15 @@ pub fn run() -> AppResult<()> {
             continue;
         }
 
-        app_state.set_viewport_rows(render_state.body_height().max(1));
+        let chrome_rows = 1
+            + Renderer::wrapped_header_lines(
+                startup_help_message.as_deref(),
+                render_state.width as usize,
+            )
+            .len();
+        app_state.set_viewport_rows(render_state.body_height_for(chrome_rows).max(1));
         for command in commands {
+            startup_help_message = None;
             if app_state.is_hex_mode() {
                 match command {
                     Command::InsertChar('q') => return Ok(()),
@@ -536,6 +589,7 @@ pub fn run() -> AppResult<()> {
                 continue;
             }
             let was_cycle_tab = matches!(command, Command::CycleTabWidth);
+            let was_toggle_bom = matches!(command, Command::ToggleBom);
             let was_toggle_wrap = matches!(command, Command::ToggleWrap);
             let was_toggle_invisibles = matches!(command, Command::ToggleInvisibles);
             match app_state.execute_command(command) {
@@ -543,6 +597,8 @@ pub fn run() -> AppResult<()> {
                 Ok(CommandDisposition::Continue) => {
                     if was_cycle_tab {
                         status_message = Some(format!("Tab width: {}", app_state.tab_width()));
+                    } else if was_toggle_bom {
+                        status_message = None;
                     } else if was_toggle_wrap {
                         let mode = if app_state.is_wrap_enabled() {
                             app_state
@@ -581,6 +637,9 @@ mod tests {
 
     use crate::command::{Command, MoveCommand};
     use crate::document::Document;
+    use crate::document::encoding::DetectedEncoding;
+    use crate::document::format::{LineEndingMode, analyze_line_endings};
+    use crate::document::save::{SaveEncoding, SaveOverrides};
 
     use crate::ui::renderer::RenderState;
 
@@ -679,6 +738,67 @@ mod tests {
         app.execute_command(Command::ToggleInvisibles)
             .expect("toggle invisibles should succeed");
         assert!(app.show_invisibles());
+    }
+
+    #[test]
+    fn toggle_bom_marks_format_dirty_and_save_persists_it() {
+        let path = fixture_path("app-toggle-bom-save.txt");
+        fs::write(&path, b"abc\n").expect("fixture write should succeed");
+
+        let mut document = Document::from_bytes(b"abc\n".to_vec());
+        document.set_path(path.clone());
+        document.configure_save_metadata(
+            DetectedEncoding::Utf8,
+            analyze_line_endings(b"abc\n", LineEndingMode::Preserve),
+        );
+        let mut app = AppState::new(document);
+
+        app.execute_command(Command::ToggleBom)
+            .expect("bom toggle should succeed");
+        assert!(app.is_dirty());
+        assert_eq!(app.status_bom_label(), "BOM");
+        assert!(app.execute_command(Command::Quit).is_err());
+
+        app.execute_command(Command::Save)
+            .expect("save should succeed after bom toggle");
+        assert!(!app.is_dirty());
+        assert!(fs::read(&path).expect("saved file should be readable").starts_with(&[
+            0xEF, 0xBB, 0xBF
+        ]));
+
+        fs::remove_file(path).expect("fixture cleanup should succeed");
+    }
+
+    #[test]
+    fn toggle_bom_disabled_for_unknown_without_utf8_override() {
+        let mut document = Document::from_bytes(vec![0xFF, 0xFE, 0x61]);
+        document.configure_save_metadata(
+            DetectedEncoding::Unknown8Bit,
+            analyze_line_endings(&[], LineEndingMode::Preserve),
+        );
+        let mut app = AppState::new(document);
+        let result = app.execute_command(Command::ToggleBom);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn toggle_bom_allowed_for_unknown_with_utf8_override() {
+        let mut document = Document::from_bytes(vec![0x61, 0x62, 0x63]);
+        document.configure_save_metadata(
+            DetectedEncoding::Unknown8Bit,
+            analyze_line_endings(b"abc", LineEndingMode::Preserve),
+        );
+        let mut app = AppState::with_save_overrides(
+            document,
+            SaveOverrides {
+                encoding: Some(SaveEncoding::Utf8),
+                line_ending_mode: None,
+            },
+        );
+
+        app.execute_command(Command::ToggleBom)
+            .expect("bom toggle should be allowed with utf-8 override");
+        assert_eq!(app.status_bom_label(), "BOM");
     }
 
     #[test]

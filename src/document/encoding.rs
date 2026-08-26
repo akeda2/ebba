@@ -12,7 +12,9 @@ pub enum ContentOverride {
 pub enum DetectedEncoding {
     Utf8,
     Utf8Bom,
+    Utf16Le,
     Utf16LeBom,
+    Utf16Be,
     Utf16BeBom,
     Unknown8Bit,
 }
@@ -22,14 +24,23 @@ impl DetectedEncoding {
         match self {
             Self::Utf8 => "utf-8",
             Self::Utf8Bom => "utf-8-bom",
+            Self::Utf16Le => "utf-16le",
             Self::Utf16LeBom => "utf-16le",
+            Self::Utf16Be => "utf-16be",
             Self::Utf16BeBom => "utf-16be",
             Self::Unknown8Bit => "unknown-8bit",
         }
     }
 
+    pub fn has_bom(self) -> bool {
+        matches!(self, Self::Utf8Bom | Self::Utf16LeBom | Self::Utf16BeBom)
+    }
+
     pub fn is_non_resynchronizable_for_lazy_load(self) -> bool {
-        matches!(self, Self::Utf16LeBom | Self::Utf16BeBom)
+        matches!(
+            self,
+            Self::Utf16Le | Self::Utf16LeBom | Self::Utf16Be | Self::Utf16BeBom
+        )
     }
 }
 
@@ -147,19 +158,17 @@ fn auto_detect_plan(bytes: &[u8], options: &DetectionOptions) -> StartupPlan {
         return utf16_plan(bytes, false, options.line_ending_mode);
     }
 
+    if let Some((encoding, text)) = utf16_without_bom_plan(bytes) {
+        return decoded_text_plan(encoding, text, false, options.line_ending_mode);
+    }
+
     let binary = inspect_binary(bytes, options.binary_scan_limit);
     if binary.is_binary_conservative() {
         return hex_read_only_plan(bytes, options.line_ending_mode);
     }
 
     if let Ok(text) = std::str::from_utf8(bytes) {
-        return decoded_text_plan(
-            DetectedEncoding::Utf8,
-            text.to_string(),
-            false,
-            bytes,
-            options.line_ending_mode,
-        );
+        return decoded_text_plan(DetectedEncoding::Utf8, text.to_string(), false, options.line_ending_mode);
     }
 
     fallback_text_plan(bytes, options.line_ending_mode)
@@ -180,17 +189,15 @@ fn forced_text_plan(
         return utf16_plan(bytes, false, line_ending_mode);
     }
 
+    if let Some((encoding, text)) = utf16_without_bom_plan(bytes) {
+        return decoded_text_plan(encoding, text, false, line_ending_mode);
+    }
+
     if inspect_binary(bytes, binary_scan_limit).is_binary_conservative() {
         return fallback_text_plan(bytes, line_ending_mode);
     }
     if let Ok(text) = std::str::from_utf8(bytes) {
-        return decoded_text_plan(
-            DetectedEncoding::Utf8,
-            text.to_string(),
-            false,
-            bytes,
-            line_ending_mode,
-        );
+        return decoded_text_plan(DetectedEncoding::Utf8, text.to_string(), false, line_ending_mode);
     }
 
     fallback_text_plan(bytes, line_ending_mode)
@@ -199,26 +206,20 @@ fn forced_text_plan(
 fn utf8_bom_plan(bytes: &[u8], line_ending_mode: LineEndingMode) -> StartupPlan {
     let body = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
     if let Ok(text) = std::str::from_utf8(body) {
-        decoded_text_plan(
-            DetectedEncoding::Utf8Bom,
-            text.to_string(),
-            true,
-            body,
-            line_ending_mode,
-        )
+        decoded_text_plan(DetectedEncoding::Utf8Bom, text.to_string(), true, line_ending_mode)
     } else {
         fallback_text_plan(bytes, line_ending_mode)
     }
 }
 
 fn utf16_plan(bytes: &[u8], little_endian: bool, line_ending_mode: LineEndingMode) -> StartupPlan {
-    if let Some(text) = decode_utf16_body(bytes, little_endian) {
+    if let Some(text) = decode_utf16_body_with_bom(bytes, little_endian) {
         let encoding = if little_endian {
             DetectedEncoding::Utf16LeBom
         } else {
             DetectedEncoding::Utf16BeBom
         };
-        decoded_text_plan(encoding, text, false, bytes, line_ending_mode)
+        decoded_text_plan(encoding, text, false, line_ending_mode)
     } else {
         fallback_text_plan(bytes, line_ending_mode)
     }
@@ -228,9 +229,9 @@ fn decoded_text_plan(
     encoding: DetectedEncoding,
     text: String,
     strip_utf8_bom: bool,
-    line_ending_bytes: &[u8],
     line_ending_mode: LineEndingMode,
 ) -> StartupPlan {
+    let line_endings = analyze_line_endings(text.as_bytes(), line_ending_mode);
     StartupPlan {
         mode: StartupContentMode::DecodedText,
         encoding,
@@ -238,7 +239,7 @@ fn decoded_text_plan(
             text,
             strip_utf8_bom,
         },
-        line_endings: analyze_line_endings(line_ending_bytes, line_ending_mode),
+        line_endings,
     }
 }
 
@@ -264,14 +265,18 @@ fn hex_read_only_plan(bytes: &[u8], line_ending_mode: LineEndingMode) -> Startup
     }
 }
 
-fn decode_utf16_body(bytes: &[u8], little_endian: bool) -> Option<String> {
+fn decode_utf16_body_with_bom(bytes: &[u8], little_endian: bool) -> Option<String> {
     let body = bytes.get(2..)?;
-    if body.len() % 2 != 0 {
+    decode_utf16_bytes(body, little_endian)
+}
+
+fn decode_utf16_bytes(bytes: &[u8], little_endian: bool) -> Option<String> {
+    if bytes.is_empty() || bytes.len() % 2 != 0 {
         return None;
     }
 
-    let mut code_units = Vec::with_capacity(body.len() / 2);
-    for chunk in body.chunks_exact(2) {
+    let mut code_units = Vec::with_capacity(bytes.len() / 2);
+    for chunk in bytes.chunks_exact(2) {
         let unit = if little_endian {
             u16::from_le_bytes([chunk[0], chunk[1]])
         } else {
@@ -281,4 +286,65 @@ fn decode_utf16_body(bytes: &[u8], little_endian: bool) -> Option<String> {
     }
 
     String::from_utf16(&code_units).ok()
+}
+
+fn utf16_without_bom_plan(bytes: &[u8]) -> Option<(DetectedEncoding, String)> {
+    detect_utf16_without_bom(bytes).and_then(|encoding| match encoding {
+        DetectedEncoding::Utf16Le => decode_utf16_bytes(bytes, true).map(|text| (encoding, text)),
+        DetectedEncoding::Utf16Be => decode_utf16_bytes(bytes, false).map(|text| (encoding, text)),
+        _ => None,
+    })
+}
+
+fn detect_utf16_without_bom(bytes: &[u8]) -> Option<DetectedEncoding> {
+    if bytes.len() < 8 || bytes.len() % 2 != 0 {
+        return None;
+    }
+
+    let little = utf16_without_bom_likely(bytes, true);
+    let big = utf16_without_bom_likely(bytes, false);
+    match (little, big) {
+        (true, false) => Some(DetectedEncoding::Utf16Le),
+        (false, true) => Some(DetectedEncoding::Utf16Be),
+        _ => None,
+    }
+}
+
+fn utf16_without_bom_likely(bytes: &[u8], little_endian: bool) -> bool {
+    let Some(text) = decode_utf16_bytes(bytes, little_endian) else {
+        return false;
+    };
+
+    let code_units = bytes.len() / 2;
+    if code_units < 4 {
+        return false;
+    }
+
+    let mut expected_zeros = 0usize;
+    let mut unexpected_zeros = 0usize;
+    for (idx, byte) in bytes.iter().enumerate() {
+        if *byte != 0 {
+            continue;
+        }
+        let expected = if little_endian {
+            idx % 2 == 1
+        } else {
+            idx % 2 == 0
+        };
+        if expected {
+            expected_zeros += 1;
+        } else {
+            unexpected_zeros += 1;
+        }
+    }
+    if expected_zeros * 2 < code_units || unexpected_zeros > 0 {
+        return false;
+    }
+
+    let char_count = text.chars().count().max(1);
+    let disallowed_controls = text
+        .chars()
+        .filter(|ch| ch.is_control() && !matches!(*ch, '\n' | '\r' | '\t'))
+        .count();
+    disallowed_controls * 20 <= char_count
 }

@@ -28,6 +28,7 @@ pub enum Command {
     Backspace,
     Delete,
     CycleTabWidth,
+    ToggleBom,
     ToggleWrap,
     ToggleInvisibles,
     OutdentSelection,

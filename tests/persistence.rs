@@ -98,6 +98,35 @@ fn save_applies_conversion_overrides() {
 }
 
 #[test]
+fn save_supports_utf16_without_bom_override() {
+    let output_path = fixture_path("save-convert-utf16-nobom");
+    let mut document = Document::from_bytes(b"a\nb\n".to_vec());
+    document.set_path(output_path.clone());
+    document.configure_save_metadata(
+        DetectedEncoding::Utf8,
+        analyze_line_endings(b"a\nb\n", LineEndingMode::Preserve),
+    );
+
+    document
+        .save(SaveOverrides {
+            encoding: Some(SaveEncoding::Utf16Le),
+            line_ending_mode: None,
+        })
+        .expect("save with utf16 no-bom override should succeed");
+
+    let written = fs::read(&output_path).expect("saved file should exist");
+    assert!(!written.starts_with(&[0xFF, 0xFE]));
+    let code_units: Vec<u16> = written
+        .chunks_exact(2)
+        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        .collect();
+    let text = String::from_utf16(&code_units).expect("utf-16 should decode");
+    assert_eq!(text, "a\nb\n");
+
+    fs::remove_file(output_path).expect("fixture cleanup should succeed");
+}
+
+#[test]
 fn conversion_failure_does_not_clobber_destination() {
     let output_path = fixture_path("save-conversion-failure");
     fs::write(&output_path, b"ORIGINAL").expect("fixture write should succeed");

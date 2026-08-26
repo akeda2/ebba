@@ -23,6 +23,7 @@ fn status_line_is_rendered_on_top_row() {
                 show_invisibles: false,
             },
             status,
+            header_message: None,
         },
     );
 
@@ -123,6 +124,7 @@ fn renderer_keeps_status_line_when_body_height_is_zero() {
                 filename: "tiny.txt".to_string(),
                 ..StatusLine::default()
             },
+            header_message: None,
         },
     );
 
@@ -190,10 +192,61 @@ fn renderer_places_cursor_on_first_text_row_not_status_row() {
                 show_invisibles: false,
             },
             status: StatusLine::default(),
+            header_message: None,
         },
     );
 
     assert_eq!(frame.cursor, Some((1, 5)));
+}
+
+#[test]
+fn renderer_places_transient_header_above_status() {
+    let doc = Document::from_bytes(b"abc".to_vec());
+    let mut state = RenderState::new(40, 4);
+    let frame = Renderer.render(
+        &mut state,
+        RenderRequest {
+            mode: RenderMode::Text {
+                document: &doc,
+                wrap: false,
+                wrap_column: None,
+                show_invisibles: false,
+            },
+            status: StatusLine {
+                filename: "notes.txt".to_string(),
+                ..StatusLine::default()
+            },
+            header_message: Some("Ctrl+Q quit"),
+        },
+    );
+
+    assert!(frame.lines[0].contains("Ctrl+Q quit"));
+    assert!(frame.lines[1].contains("notes.txt"));
+    assert_eq!(frame.cursor, Some((2, 5)));
+}
+
+#[test]
+fn renderer_wraps_transient_header_by_width() {
+    let doc = Document::from_bytes(b"abc".to_vec());
+    let mut state = RenderState::new(10, 6);
+    let frame = Renderer.render(
+        &mut state,
+        RenderRequest {
+            mode: RenderMode::Text {
+                document: &doc,
+                wrap: false,
+                wrap_column: None,
+                show_invisibles: false,
+            },
+            status: StatusLine::default(),
+            header_message: Some("1234567890AB"),
+        },
+    );
+
+    assert_eq!(frame.lines[0], "1234567890");
+    assert_eq!(frame.lines[1], "AB");
+    assert!(!frame.lines[2].is_empty());
+    assert_eq!(frame.cursor, Some((3, 5)));
 }
 
 #[test]

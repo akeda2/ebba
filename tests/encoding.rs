@@ -2,7 +2,7 @@ use ebba::document::encoding::{
     ConfirmationReason, ContentOverride, DetectedEncoding, DetectionOptions, StartupContentMode,
     StartupDecision, StartupPayload, detect_startup_mode,
 };
-use ebba::document::format::LineEndingMode;
+use ebba::document::format::{LineEndingIndicator, LineEndingMode};
 
 #[test]
 fn detects_utf8_and_bom_encoded_text() {
@@ -211,4 +211,45 @@ fn malformed_utf16_bom_falls_back_to_byte_preserving_text() {
         }
         other => panic!("expected fallback plan, got {other:?}"),
     }
+}
+
+#[test]
+fn detects_bomless_utf16le_text_conservatively() {
+    let bomless_utf16le = [b'h', 0x00, b'e', 0x00, b'l', 0x00, b'l', 0x00, b'o', 0x00];
+    let decision = detect_startup_mode(
+        &bomless_utf16le,
+        DetectionOptions {
+            confirm_non_resynchronizable_encoding: false,
+            ..DetectionOptions::default()
+        },
+    );
+
+    match decision {
+        StartupDecision::Ready(plan) => {
+            assert_eq!(plan.mode, StartupContentMode::DecodedText);
+            assert_eq!(plan.encoding, DetectedEncoding::Utf16Le);
+            match plan.payload {
+                StartupPayload::DecodedText { text, .. } => assert_eq!(text, "hello"),
+                other => panic!("expected decoded text payload, got {other:?}"),
+            }
+        }
+        other => panic!("expected ready plan, got {other:?}"),
+    }
+}
+
+#[test]
+fn line_ending_indicator_supports_cr_and_none() {
+    let cr_only = detect_startup_mode(b"a\rb\r", DetectionOptions::default());
+    let cr_plan = match cr_only {
+        StartupDecision::Ready(plan) => plan,
+        other => panic!("expected ready plan, got {other:?}"),
+    };
+    assert_eq!(cr_plan.line_endings.indicator(), LineEndingIndicator::Cr);
+
+    let none = detect_startup_mode(b"abc", DetectionOptions::default());
+    let none_plan = match none {
+        StartupDecision::Ready(plan) => plan,
+        other => panic!("expected ready plan, got {other:?}"),
+    };
+    assert_eq!(none_plan.line_endings.indicator(), LineEndingIndicator::None);
 }

@@ -100,6 +100,14 @@ impl Document {
         self.persistence.path.as_deref()
     }
 
+    pub fn detected_encoding(&self) -> DetectedEncoding {
+        self.persistence.detected_encoding
+    }
+
+    pub fn line_endings(&self) -> &LineEndingMetadata {
+        &self.persistence.line_endings
+    }
+
     pub fn configure_save_metadata(
         &mut self,
         detected_encoding: DetectedEncoding,
@@ -131,7 +139,9 @@ impl Document {
             overrides,
         )?;
         self.persistence.detected_encoding = outcome.encoding.detected_encoding();
-        self.persistence.line_endings.mode = outcome.line_ending_mode;
+        self.persistence
+            .line_endings
+            .apply_saved_mode(outcome.line_ending_mode);
         self.persistence.dirty = false;
         Ok(())
     }

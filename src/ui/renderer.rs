@@ -5,7 +5,7 @@ use crate::ui::hex_view::{HexRenderOutput, HexView, HexViewport};
 use crate::ui::status::StatusLine;
 use crate::ui::text_view::{TextRenderOutput, TextView, TextViewport};
 
-const STATUS_ROWS: usize = 1;
+const BASE_CHROME_ROWS: usize = 1;
 
 #[derive(Debug, Clone, Copy)]
 pub enum RenderMode<'a> {
@@ -35,7 +35,11 @@ impl RenderState {
     }
 
     pub fn body_height(&self) -> usize {
-        self.height.saturating_sub(STATUS_ROWS as u16) as usize
+        self.body_height_for(BASE_CHROME_ROWS)
+    }
+
+    pub fn body_height_for(&self, chrome_rows: usize) -> usize {
+        self.height.saturating_sub(chrome_rows as u16) as usize
     }
 
     pub fn resize(&mut self, width: u16, height: u16, cursor_row: usize, total_rows: usize) {
@@ -45,17 +49,28 @@ impl RenderState {
     }
 
     pub fn ensure_cursor_visible(&mut self, cursor_row: usize, total_rows: usize) {
-        let body_height = self.body_height().max(1);
+        self.ensure_cursor_visible_for_body_height(cursor_row, total_rows, self.body_height().max(1));
+    }
+
+    pub fn clamp_scroll(&mut self, total_rows: usize) {
+        self.clamp_scroll_for_body_height(total_rows, self.body_height().max(1));
+    }
+
+    fn ensure_cursor_visible_for_body_height(
+        &mut self,
+        cursor_row: usize,
+        total_rows: usize,
+        body_height: usize,
+    ) {
         if cursor_row < self.scroll_row {
             self.scroll_row = cursor_row;
         } else if cursor_row >= self.scroll_row + body_height {
             self.scroll_row = cursor_row + 1 - body_height;
         }
-        self.clamp_scroll(total_rows);
+        self.clamp_scroll_for_body_height(total_rows, body_height);
     }
 
-    pub fn clamp_scroll(&mut self, total_rows: usize) {
-        let body_height = self.body_height().max(1);
+    fn clamp_scroll_for_body_height(&mut self, total_rows: usize, body_height: usize) {
         let max_scroll = total_rows.saturating_sub(body_height);
         self.scroll_row = self.scroll_row.min(max_scroll);
     }
@@ -77,6 +92,7 @@ impl RenderFrame {
 pub struct RenderRequest<'a> {
     pub mode: RenderMode<'a>,
     pub status: StatusLine,
+    pub header_message: Option<&'a str>,
 }
 
 pub trait TerminalFlush {
@@ -118,9 +134,28 @@ impl<W: Write> TerminalFlush for WriterFlush<W> {
 pub struct Renderer;
 
 impl Renderer {
+    pub fn wrapped_header_lines(header_message: Option<&str>, width: usize) -> Vec<String> {
+        let Some(message) = header_message else {
+            return Vec::new();
+        };
+        if width == 0 {
+            return Vec::new();
+        }
+        let chars: Vec<char> = message.chars().collect();
+        if chars.is_empty() {
+            return vec![String::new()];
+        }
+        chars
+            .chunks(width)
+            .map(|chunk| chunk.iter().collect())
+            .collect()
+    }
+
     pub fn render(&self, state: &mut RenderState, request: RenderRequest<'_>) -> RenderFrame {
         let body_width = state.width as usize;
-        let body_height = state.body_height();
+        let header_lines = Self::wrapped_header_lines(request.header_message, body_width);
+        let chrome_rows = 1 + header_lines.len();
+        let body_height = state.body_height_for(chrome_rows);
         let mut status = request.status;
 
         match request.mode {
@@ -145,10 +180,13 @@ impl Renderer {
                     text.total_lines,
                 );
                 let mut lines = vec![status.render(state.width as usize)];
+                lines.splice(0..0, header_lines.iter().cloned());
                 lines.append(&mut text.lines);
                 RenderFrame {
                     lines,
-                    cursor: text.cursor.map(|(row, col)| ((row + 1) as u16, col as u16)),
+                    cursor: text
+                        .cursor
+                        .map(|(row, col)| ((row + chrome_rows) as u16, col as u16)),
                 }
             }
 
@@ -156,6 +194,7 @@ impl Renderer {
                 let mut hex = self.render_hex(state, bytes, body_width, body_height);
                 status = status.with_position(state.scroll_row + 1, 1, hex.total_rows);
                 let mut lines = vec![status.render(state.width as usize)];
+                lines.splice(0..0, header_lines.iter().cloned());
                 lines.append(&mut hex.lines);
                 RenderFrame {
                     lines,
@@ -188,7 +227,11 @@ impl Renderer {
                 show_invisibles,
             },
         );
-        state.ensure_cursor_visible(rendered.cursor_line, rendered.total_lines);
+        state.ensure_cursor_visible_for_body_height(
+            rendered.cursor_line,
+            rendered.total_lines,
+            body_height.max(1),
+        );
         if (state.scroll_row != previous_scroll || rendered.cursor.is_none()) && body_height > 0 {
             rendered = TextView::render(
                 document,
@@ -221,7 +264,7 @@ impl Renderer {
                 height: body_height,
             },
         );
-        state.clamp_scroll(rendered.total_rows);
+        state.clamp_scroll_for_body_height(rendered.total_rows, body_height.max(1));
         if body_height > 0 && state.scroll_row != previous_scroll {
             rendered = HexView::render(
                 bytes,

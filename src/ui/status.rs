@@ -8,6 +8,7 @@ pub struct StatusLine {
     pub total_lines: usize,
     pub encoding: String,
     pub line_ending: String,
+    pub bom: String,
     pub wrap_column: Option<usize>,
     pub show_invisibles: bool,
     pub message: Option<String>,
@@ -24,6 +25,7 @@ impl Default for StatusLine {
             total_lines: 1,
             encoding: String::from("utf-8"),
             line_ending: String::from("LF"),
+            bom: String::from("NO-BOM"),
             wrap_column: None,
             show_invisibles: false,
             message: Some(String::from("ready")),
@@ -53,7 +55,7 @@ impl StatusLine {
             "INV:OFF"
         };
         let left = format!(
-            "{} [{}|{}] Ln {}, Col {} / {} {} {} {} {}",
+            "{} [{}|{}] Ln {}, Col {} / {} {} {} {} {} {}",
             self.filename,
             modified,
             access,
@@ -63,7 +65,8 @@ impl StatusLine {
             wrap,
             invisibles,
             self.encoding,
-            self.line_ending
+            self.line_ending,
+            self.bom
         );
         let message = self.message.as_deref().unwrap_or("");
 

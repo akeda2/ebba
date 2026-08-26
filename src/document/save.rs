@@ -16,7 +16,9 @@ pub enum SaveEncoding {
     PreserveBytes,
     Utf8,
     Utf8Bom,
+    Utf16Le,
     Utf16LeBom,
+    Utf16Be,
     Utf16BeBom,
 }
 
@@ -26,7 +28,9 @@ impl std::fmt::Display for SaveEncoding {
             Self::PreserveBytes => "preserve-bytes",
             Self::Utf8 => "utf-8",
             Self::Utf8Bom => "utf-8-bom",
+            Self::Utf16Le => "utf-16le",
             Self::Utf16LeBom => "utf-16le-bom",
+            Self::Utf16Be => "utf-16be",
             Self::Utf16BeBom => "utf-16be-bom",
         };
         f.write_str(label)
@@ -38,7 +42,9 @@ impl SaveEncoding {
         match encoding {
             DetectedEncoding::Utf8 => Self::Utf8,
             DetectedEncoding::Utf8Bom => Self::Utf8Bom,
+            DetectedEncoding::Utf16Le => Self::Utf16Le,
             DetectedEncoding::Utf16LeBom => Self::Utf16LeBom,
+            DetectedEncoding::Utf16Be => Self::Utf16Be,
             DetectedEncoding::Utf16BeBom => Self::Utf16BeBom,
             DetectedEncoding::Unknown8Bit => Self::PreserveBytes,
         }
@@ -50,6 +56,8 @@ impl SaveEncoding {
             "utf8bom" | "utf-8-bom" => Some(Self::Utf8Bom),
             "utf16le" | "utf-16le" | "utf16le-bom" | "utf-16le-bom" => Some(Self::Utf16LeBom),
             "utf16be" | "utf-16be" | "utf16be-bom" | "utf-16be-bom" => Some(Self::Utf16BeBom),
+            "utf16le-nobom" | "utf-16le-nobom" => Some(Self::Utf16Le),
+            "utf16be-nobom" | "utf-16be-nobom" => Some(Self::Utf16Be),
             _ => None,
         }
     }
@@ -59,9 +67,40 @@ impl SaveEncoding {
             Self::PreserveBytes => DetectedEncoding::Unknown8Bit,
             Self::Utf8 => DetectedEncoding::Utf8,
             Self::Utf8Bom => DetectedEncoding::Utf8Bom,
+            Self::Utf16Le => DetectedEncoding::Utf16Le,
             Self::Utf16LeBom => DetectedEncoding::Utf16LeBom,
+            Self::Utf16Be => DetectedEncoding::Utf16Be,
             Self::Utf16BeBom => DetectedEncoding::Utf16BeBom,
         }
+    }
+
+    pub fn has_bom(self) -> bool {
+        matches!(self, Self::Utf8Bom | Self::Utf16LeBom | Self::Utf16BeBom)
+    }
+
+    pub fn encoding_label(self) -> &'static str {
+        match self {
+            Self::PreserveBytes => "UNKNOWN-8BIT",
+            Self::Utf8 | Self::Utf8Bom => "UTF-8",
+            Self::Utf16Le | Self::Utf16LeBom => "UTF-16LE",
+            Self::Utf16Be | Self::Utf16BeBom => "UTF-16BE",
+        }
+    }
+
+    pub fn toggled_bom(self) -> Option<Self> {
+        match self {
+            Self::PreserveBytes => None,
+            Self::Utf8 => Some(Self::Utf8Bom),
+            Self::Utf8Bom => Some(Self::Utf8),
+            Self::Utf16Le => Some(Self::Utf16LeBom),
+            Self::Utf16LeBom => Some(Self::Utf16Le),
+            Self::Utf16Be => Some(Self::Utf16BeBom),
+            Self::Utf16BeBom => Some(Self::Utf16Be),
+        }
+    }
+
+    pub fn is_utf8_family(self) -> bool {
+        matches!(self, Self::Utf8 | Self::Utf8Bom)
     }
 }
 
@@ -295,10 +334,10 @@ fn encode_chunk(
             }
             writer.write_all(utf8_bytes)?;
         }
-        SaveEncoding::Utf16LeBom => {
+        SaveEncoding::Utf16Le | SaveEncoding::Utf16LeBom => {
             let text = std::str::from_utf8(utf8_bytes)
                 .map_err(|_| SaveError::InvalidUtf8ForConversion { target: encoding })?;
-            if !*wrote_bom {
+            if encoding == SaveEncoding::Utf16LeBom && !*wrote_bom {
                 writer.write_all(&[0xFF, 0xFE])?;
                 *wrote_bom = true;
             }
@@ -308,10 +347,10 @@ fn encode_chunk(
             }
             writer.write_all(&out)?;
         }
-        SaveEncoding::Utf16BeBom => {
+        SaveEncoding::Utf16Be | SaveEncoding::Utf16BeBom => {
             let text = std::str::from_utf8(utf8_bytes)
                 .map_err(|_| SaveError::InvalidUtf8ForConversion { target: encoding })?;
-            if !*wrote_bom {
+            if encoding == SaveEncoding::Utf16BeBom && !*wrote_bom {
                 writer.write_all(&[0xFE, 0xFF])?;
                 *wrote_bom = true;
             }
