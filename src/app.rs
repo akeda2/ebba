@@ -175,6 +175,7 @@ impl AppState {
                 };
                 Ok(CommandDisposition::Continue)
             }
+            Command::ShowHelp => Ok(CommandDisposition::Continue),
             Command::ToggleBom => {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
@@ -477,15 +478,7 @@ pub fn run() -> AppResult<()> {
     let renderer = Renderer;
     let mut render_state = RenderState::new(terminal.width, terminal.height);
     let mut flusher = WriterFlush::new(stdout());
-    let mut startup_help_message = if app_state.is_hex_mode() {
-        Some(String::from(
-            "q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • ↑/↓/PgUp/PgDn/Home/End scroll • PRESERVE = keep existing line endings",
-        ))
-    } else {
-        Some(String::from(
-            "Ctrl+Q/Alt+Q/F10 quit • Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 force quit • Ctrl+B/Alt+B/Ctrl+Shift+B BOM • Ctrl+T tab • Ctrl+W wrap • Ctrl+K/Alt+I invisibles",
-        ))
-    };
+    let mut startup_help_message = Some(startup_help_text(app_state.is_hex_mode()));
     let mut status_message: Option<String> = None;
     let mut needs_render = true;
 
@@ -564,9 +557,16 @@ pub fn run() -> AppResult<()> {
                 startup_help_message.as_deref(),
                 render_state.width as usize,
             )
-            .len();
+            .len()
+            + usize::from(startup_help_message.is_some());
         app_state.set_viewport_rows(render_state.body_height_for(chrome_rows).max(1));
         for command in commands {
+            if matches!(command, Command::ShowHelp) {
+                startup_help_message = Some(startup_help_text(app_state.is_hex_mode()));
+                status_message = None;
+                needs_render = true;
+                continue;
+            }
             startup_help_message = None;
             if app_state.is_hex_mode() {
                 match command {
@@ -627,6 +627,18 @@ pub fn run() -> AppResult<()> {
                 }
             }
         }
+    }
+}
+
+fn startup_help_text(hex_mode: bool) -> String {
+    if hex_mode {
+        String::from(
+            "Quit: q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Help: Ctrl+H/Alt+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
+        )
+    } else {
+        String::from(
+            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V • Select all: Ctrl+A • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+Home/Ctrl+End/PgUp/PgDn • Extend: Shift+Arrows/Shift+PgUp/Shift+PgDn • Edit: Enter/Backspace/Delete/Tab/Shift+Tab",
+        )
     }
 }
 
@@ -738,6 +750,16 @@ mod tests {
         app.execute_command(Command::ToggleInvisibles)
             .expect("toggle invisibles should succeed");
         assert!(app.show_invisibles());
+    }
+
+    #[test]
+    fn show_help_command_is_non_destructive() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        let outcome = app
+            .execute_command(Command::ShowHelp)
+            .expect("show help should succeed");
+        assert_eq!(outcome, CommandDisposition::Continue);
     }
 
     #[test]

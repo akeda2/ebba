@@ -133,6 +133,8 @@ impl<W: Write> TerminalFlush for WriterFlush<W> {
 #[derive(Debug, Default)]
 pub struct Renderer;
 
+const HEADER_SEPARATOR_RIGHT_MARGIN: usize = 3;
+
 impl Renderer {
     pub fn wrapped_header_lines(header_message: Option<&str>, width: usize) -> Vec<String> {
         let Some(message) = header_message else {
@@ -141,20 +143,22 @@ impl Renderer {
         if width == 0 {
             return Vec::new();
         }
-        let chars: Vec<char> = message.chars().collect();
-        if chars.is_empty() {
-            return vec![String::new()];
+        let mut lines = Vec::new();
+        for segment in message.split('\n') {
+            if segment.contains(" • ") {
+                lines.extend(columnize_segment(segment, width));
+            } else {
+                lines.extend(wrap_segment(segment, width));
+            }
         }
-        chars
-            .chunks(width)
-            .map(|chunk| chunk.iter().collect())
-            .collect()
+        lines
     }
 
     pub fn render(&self, state: &mut RenderState, request: RenderRequest<'_>) -> RenderFrame {
         let body_width = state.width as usize;
         let header_lines = Self::wrapped_header_lines(request.header_message, body_width);
-        let chrome_rows = 1 + header_lines.len();
+        let show_separator = !header_lines.is_empty();
+        let chrome_rows = 1 + header_lines.len() + usize::from(show_separator);
         let body_height = state.body_height_for(chrome_rows);
         let mut status = request.status;
 
@@ -181,6 +185,9 @@ impl Renderer {
                 );
                 let mut lines = vec![status.render(state.width as usize)];
                 lines.splice(0..0, header_lines.iter().cloned());
+                if show_separator {
+                    lines.push(header_separator_line(state.width as usize));
+                }
                 lines.append(&mut text.lines);
                 RenderFrame {
                     lines,
@@ -195,6 +202,9 @@ impl Renderer {
                 status = status.with_position(state.scroll_row + 1, 1, hex.total_rows);
                 let mut lines = vec![status.render(state.width as usize)];
                 lines.splice(0..0, header_lines.iter().cloned());
+                if show_separator {
+                    lines.push(header_separator_line(state.width as usize));
+                }
                 lines.append(&mut hex.lines);
                 RenderFrame {
                     lines,
@@ -277,6 +287,71 @@ impl Renderer {
         }
         rendered
     }
+}
+
+fn wrap_segment(segment: &str, width: usize) -> Vec<String> {
+    let chars: Vec<char> = segment.chars().collect();
+    if chars.is_empty() {
+        return vec![String::new()];
+    }
+    chars
+        .chunks(width)
+        .map(|chunk| chunk.iter().collect())
+        .collect()
+}
+
+fn columnize_segment(segment: &str, width: usize) -> Vec<String> {
+    let items: Vec<String> = segment
+        .split(" • ")
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(ToOwned::to_owned)
+        .collect();
+    if items.is_empty() {
+        return wrap_segment(segment, width);
+    }
+    let max_item_width = items
+        .iter()
+        .map(|item| item.chars().count())
+        .max()
+        .unwrap_or(0);
+    if max_item_width == 0 || max_item_width >= width {
+        return wrap_segment(segment, width);
+    }
+
+    let col_width = max_item_width + 2;
+    let cols = (width + 2) / col_width;
+    if cols <= 1 {
+        return wrap_segment(segment, width);
+    }
+
+    let rows = items.len().div_ceil(cols);
+    let mut lines = Vec::with_capacity(rows);
+    for row in 0..rows {
+        let mut line = String::new();
+        for col in 0..cols {
+            let idx = row * cols + col;
+            if idx >= items.len() {
+                break;
+            }
+            let item = &items[idx];
+            let item_width = item.chars().count();
+            line.push_str(item);
+            if col + 1 < cols && idx + 1 < items.len() {
+                let pad = col_width.saturating_sub(item_width);
+                line.push_str(&" ".repeat(pad));
+            }
+        }
+        lines.push(line);
+    }
+    lines
+}
+
+fn header_separator_line(width: usize) -> String {
+    if width <= HEADER_SEPARATOR_RIGHT_MARGIN {
+        return String::new();
+    }
+    "-".repeat(width - HEADER_SEPARATOR_RIGHT_MARGIN)
 }
 
 #[cfg(test)]

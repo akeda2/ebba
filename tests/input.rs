@@ -41,6 +41,7 @@ fn maps_core_ctrl_shortcuts() {
         (KeyCode::Char('z'), Command::Undo),
         (KeyCode::Char('y'), Command::Redo),
         (KeyCode::Char('s'), Command::Save),
+        (KeyCode::Char('h'), Command::ShowHelp),
         (KeyCode::Char('b'), Command::ToggleBom),
         (KeyCode::Char('t'), Command::CycleTabWidth),
         (KeyCode::Char('w'), Command::ToggleWrap),
@@ -93,6 +94,12 @@ fn maps_alt_i_to_toggle_invisibles() {
 fn maps_alt_b_to_toggle_bom() {
     let key = KeyEvent::new(KeyCode::Char('b'), KeyModifiers::ALT);
     assert_eq!(command_from_key_event(key), Some(Command::ToggleBom));
+}
+
+#[test]
+fn maps_alt_h_to_show_help() {
+    let key = KeyEvent::new(KeyCode::Char('h'), KeyModifiers::ALT);
+    assert_eq!(command_from_key_event(key), Some(Command::ShowHelp));
 }
 
 #[test]
