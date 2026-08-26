@@ -262,6 +262,14 @@ fn renderer_columnizes_bulleted_header_segments() {
 }
 
 #[test]
+fn renderer_uses_single_column_for_narrow_bulleted_header() {
+    let lines = Renderer::wrapped_header_lines(Some("Save: Ctrl+S • Quit: Ctrl+Q"), 12);
+    assert_eq!(lines.len(), 2);
+    assert_eq!(lines[0], "Save: Ctrl+S");
+    assert_eq!(lines[1], "Quit: Ctrl+Q");
+}
+
+#[test]
 fn wrapped_status_shows_logical_line_and_wrap_segment() {
     let mut doc = Document::from_bytes(b"abcdefghij\nx".to_vec());
     doc.move_right(false).expect("move should succeed");

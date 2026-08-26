@@ -301,6 +301,20 @@ fn wrap_segment(segment: &str, width: usize) -> Vec<String> {
         .collect()
 }
 
+fn truncate_to_width(input: &str, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    input.chars().take(width).collect()
+}
+
+fn single_column_segment(items: &[String], width: usize) -> Vec<String> {
+    items
+        .iter()
+        .map(|item| truncate_to_width(item, width))
+        .collect()
+}
+
 fn columnize_segment(segment: &str, width: usize) -> Vec<String> {
     let items: Vec<String> = segment
         .split(" • ")
@@ -317,13 +331,13 @@ fn columnize_segment(segment: &str, width: usize) -> Vec<String> {
         .max()
         .unwrap_or(0);
     if max_item_width == 0 || max_item_width >= width {
-        return wrap_segment(segment, width);
+        return single_column_segment(&items, width);
     }
 
     let col_width = max_item_width + 2;
     let cols = (width + 2) / col_width;
     if cols <= 1 {
-        return wrap_segment(segment, width);
+        return single_column_segment(&items, width);
     }
 
     let rows = items.len().div_ceil(cols);
