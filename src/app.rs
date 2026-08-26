@@ -653,7 +653,6 @@ pub fn run() -> AppResult<()> {
             }
             let was_cycle_tab = matches!(&command, Command::CycleTabWidth);
             let was_toggle_bom = matches!(&command, Command::ToggleBom);
-            let was_toggle_wrap = matches!(&command, Command::ToggleWrap);
             let was_toggle_invisibles = matches!(&command, Command::ToggleInvisibles);
             let was_copy_or_cut = matches!(&command, Command::Copy | Command::Cut);
             match app_state.execute_command(command) {
@@ -666,16 +665,6 @@ pub fn run() -> AppResult<()> {
                         status_message = Some(format!("Tab width: {}", app_state.tab_width()));
                     } else if was_toggle_bom {
                         status_message = None;
-                    } else if was_toggle_wrap {
-                        let mode = if app_state.is_wrap_enabled() {
-                            app_state
-                                .wrap_column()
-                                .map(|column| column.to_string())
-                                .unwrap_or_else(|| "on".to_string())
-                        } else {
-                            "off".to_string()
-                        };
-                        status_message = Some(format!("Wrap: {mode}"));
                     } else if was_toggle_invisibles {
                         let mode = if app_state.show_invisibles() {
                             "on"
