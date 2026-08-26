@@ -82,6 +82,10 @@ ebba README.md --wrap 80 --invisibles
 - Insert tab / indent selection: `Tab`
 - Outdent selection: `Shift+Tab`
 
+### Tab indenting
+- Pressing 'Tab' after selecting one/multiple lines will move all selected lines one tab-spacing.
+- 'Shift+Tab' does the opposite.
+
 ### Clipboard and selection
 
 - Copy: `Ctrl+C`
