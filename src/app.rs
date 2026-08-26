@@ -699,7 +699,6 @@ pub fn run() -> AppResult<()> {
             }
             let was_cycle_tab = matches!(&command, Command::CycleTabWidth);
             let was_toggle_bom = matches!(&command, Command::ToggleBom);
-            let was_toggle_invisibles = matches!(&command, Command::ToggleInvisibles);
             let was_copy_or_cut = matches!(&command, Command::Copy | Command::Cut);
             match app_state.execute_command(command) {
                 Ok(CommandDisposition::Exit) => return Ok(()),
@@ -709,13 +708,6 @@ pub fn run() -> AppResult<()> {
                     }
                     if was_cycle_tab || was_toggle_bom {
                         status_message = None;
-                    } else if was_toggle_invisibles {
-                        let mode = if app_state.show_invisibles() {
-                            "on"
-                        } else {
-                            "off"
-                        };
-                        status_message = Some(format!("Invisibles: {mode}"));
                     } else {
                         status_message = None;
                     }
