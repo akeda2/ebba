@@ -58,46 +58,18 @@ ebba README.md --wrap 80 --invisibles
 
 - `FILE`  
   Path to the file to open.
-- `--encoding <ENCODING>`  
-  Save encoding override: `utf-8`, `utf-8-bom`, `utf-16le-bom`, `utf-16be-bom`.
-- `--line-ending <lf|crlf>`  
-  Force line endings on save (otherwise preserve mode).
-- `--text`  
-  Force text startup mode.
-- `--binary`  
-  Force binary fallback mode (read-only hex view).
-- `--wrap [COLUMN]`  
-  Enable wrapping; optional fixed wrap column (for example `--wrap 80`).
-- `--invisibles`  
-  Show invisible characters (space `·`, LF `␊`, CRLF `␍`).
-- `--config <PATH>`  
-  Load YAML config from explicit path.
-- `--keymap <auto|mac|linux>`  
-  Force keybinding profile at startup (useful for cross-platform keymap testing).
+- `--encoding <ENCODING>`  Save encoding override: `utf-8`, `utf-8-bom`, `utf-16le-bom`, `utf-16be-bom`.
+- `--line-ending <lf|crlf>`  Force line endings on save (otherwise preserve mode).
+- `--text`  Force text startup mode.
+- `--binary`  Force binary fallback mode (read-only hex view).
+- `--wrap [COLUMN]`  Enable wrapping; optional fixed wrap column (for example `--wrap 80`).
+- `--invisibles`  Show invisible characters (space `·`, LF `␊`, CRLF `␍`).
+- `--config <PATH>`  Load YAML config from explicit path.
+- `--keymap <auto|mac|linux>`  Force keybinding profile at startup (useful for cross-platform keymap testing).
 
 `--text` and `--binary` are mutually exclusive.
 
 ## Keybindings
-
-`ebba` auto-detects macOS and switches to a macOS-oriented profile.
-
-### macOS profile
-
-Terminal apps on macOS may intercept some `⌘` keys before `ebba` receives them. Control fallbacks remain available for all core actions.
-
-- Save: `⌘S`, fallback `Ctrl+S`
-- Help: `⇧⌘?`, fallback `Ctrl+H`
-- Quit: `⌘Q`, fallback `Ctrl+Q`, `F10`
-- Force quit: `Ctrl+Alt+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, `F12`
-- Copy/Cut/Paste: `⌘C`, `⌘X`, `⌘V` (plus `Ctrl+C/X/V`)
-- Select all: `⌘A` (plus `Ctrl+A`)
-- Undo/Redo: `⌘Z`, `⇧⌘Z` (plus `Ctrl+Y`)
-- Word move: `⌥←`, `⌥→` (plus `Ctrl+←`, `Ctrl+→`)
-- Line move: `⌘←`, `⌘→`
-- Document move: `⌘↑`, `⌘↓` (plus `Ctrl+Home`, `Ctrl+End`)
-- Delete previous word: `⌥Backspace` (plus `Ctrl+Backspace`)
-- Delete to line start: `⌘Backspace` (plus `Ctrl+U`)
-- Editor toggles (editor-specific): `Ctrl+B` BOM, `Ctrl+T` tab width, `Ctrl+W` wrap, `Ctrl+K` invisibles
 
 ### Linux/other profile
 
@@ -118,6 +90,26 @@ Terminal apps on macOS may intercept some `⌘` keys before `ebba` receives them
 - Toggle tab width (2 → 4 → 8): `Ctrl+T`
 - Toggle wrap: `Ctrl+W`
 - Toggle invisibles: `Ctrl+K`, `Alt+I`
+
+### macOS profile
+
+`ebba` auto-detects macOS and switches to a macOS-oriented profile.
+Terminal apps on macOS may intercept some `⌘` keys before `ebba` receives them. Control fallbacks remain available for all core actions.
+
+- Save: `⌘S`, fallback `Ctrl+S`
+- Help: `⇧⌘?`, fallback `Ctrl+H`
+- Quit: `⌘Q`, fallback `Ctrl+Q`, `F10`
+- Force quit: `Ctrl+Alt+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, `F12`
+- Copy/Cut/Paste: `⌘C`, `⌘X`, `⌘V` (plus `Ctrl+C/X/V`)
+- Select all: `⌘A` (plus `Ctrl+A`)
+- Undo/Redo: `⌘Z`, `⇧⌘Z` (plus `Ctrl+Y`)
+- Word move: `⌥←`, `⌥→` (plus `Ctrl+←`, `Ctrl+→`)
+- Line move: `⌘←`, `⌘→`
+- Document move: `⌘↑`, `⌘↓` (plus `Ctrl+Home`, `Ctrl+End`)
+- Delete previous word: `⌥Backspace` (plus `Ctrl+Backspace`)
+- Delete to line start: `⌘Backspace` (plus `Ctrl+U`)
+- Editor toggles (editor-specific): `Ctrl+B` BOM, `Ctrl+T` tab width, `Ctrl+W` wrap, `Ctrl+K` invisibles
+
 
 ### Shared editing and selection
 
