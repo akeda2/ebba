@@ -646,6 +646,7 @@ pub fn run() -> AppResult<()> {
                     None
                 },
                 show_invisibles: app_state.show_invisibles(),
+                selection_mode: Some(app_state.selection_mode_enabled()),
                 message: status_message.clone(),
                 ..StatusLine::default()
             };
