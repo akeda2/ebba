@@ -62,9 +62,9 @@ impl StatusLine {
         };
         let selection_mode = self.selection_mode.map(|enabled| {
             if enabled {
-                "Select mode:ON"
+                "Select-mode:ON"
             } else {
-                "Select mode:OFF"
+                "Select-mode:OFF"
             }
         });
         let line_label = if let Some((segment, total)) = self.wrapped_segment {
@@ -134,12 +134,12 @@ mod tests {
             ..StatusLine::default()
         }
         .render(200);
-        assert!(on.contains("Select mode:ON"));
+        assert!(on.contains("Select-mode:ON"));
         let off = StatusLine {
             selection_mode: Some(false),
             ..StatusLine::default()
         }
         .render(200);
-        assert!(off.contains("Select mode:OFF"));
+        assert!(off.contains("Select-mode:OFF"));
     }
 }
