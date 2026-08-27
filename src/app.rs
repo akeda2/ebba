@@ -43,6 +43,7 @@ pub struct AppState {
     wrap_enabled: bool,
     wrap_column: Option<usize>,
     show_invisibles: bool,
+    selection_mode: bool,
     keybinding_profile: KeybindingProfile,
 }
 
@@ -68,6 +69,7 @@ impl AppState {
             wrap_enabled: false,
             wrap_column: None,
             show_invisibles: false,
+            selection_mode: false,
             keybinding_profile: KeybindingProfile::current(),
         }
     }
@@ -122,6 +124,10 @@ impl AppState {
 
     pub fn show_invisibles(&self) -> bool {
         self.show_invisibles
+    }
+
+    pub fn selection_mode_enabled(&self) -> bool {
+        self.selection_mode
     }
 
     pub fn set_keybinding_profile(&mut self, profile: KeybindingProfile) {
@@ -219,6 +225,10 @@ impl AppState {
                 self.show_invisibles = !self.show_invisibles;
                 Ok(CommandDisposition::Continue)
             }
+            Command::ToggleSelectionMode => {
+                self.selection_mode = !self.selection_mode;
+                Ok(CommandDisposition::Continue)
+            }
             Command::OutdentSelection => {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
@@ -274,14 +284,36 @@ impl AppState {
                 Ok(CommandDisposition::Continue)
             }
             Command::Copy => {
+                let mut used_line_fallback = false;
+                let fallback_caret = self.document.selection().active.byte_offset;
+                if self.keybinding_profile == KeybindingProfile::LinuxConsole
+                    && self.document.selection().is_caret()
+                {
+                    used_line_fallback = self
+                        .document
+                        .select_current_line(false)
+                        .map_err(|error| AppError::Message(error.to_string()))?;
+                }
                 self.document
                     .copy_selection()
                     .map_err(|error| AppError::Message(error.to_string()))?;
+                self.selection_mode = false;
+                if used_line_fallback {
+                    self.document.move_to_byte_offset(fallback_caret, false);
+                }
                 Ok(CommandDisposition::Continue)
             }
             Command::Cut => {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
+                }
+                if self.keybinding_profile == KeybindingProfile::LinuxConsole
+                    && self.document.selection().is_caret()
+                {
+                    let _ = self
+                        .document
+                        .select_current_line(true)
+                        .map_err(|error| AppError::Message(error.to_string()))?;
                 }
                 self.document
                     .cut_selection()
@@ -329,6 +361,7 @@ impl AppState {
                 Ok(CommandDisposition::Continue)
             }
             Command::Move { direction, extend } => {
+                let extend = extend || self.selection_mode;
                 if self.wrap_enabled
                     && matches!(
                         direction,
@@ -614,6 +647,7 @@ pub fn run() -> AppResult<()> {
                     None
                 },
                 show_invisibles: app_state.show_invisibles(),
+                selection_mode: Some(app_state.selection_mode_enabled()),
                 message: status_message.clone(),
                 ..StatusLine::default()
             };
@@ -731,6 +765,9 @@ fn startup_help_text(hex_mode: bool, profile: KeybindingProfile) -> String {
             KeybindingProfile::Linux => String::from(
                 "Quit: q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q •   Ctrl+Shift+Q/Ctrl+G/F12 • Help: Ctrl+H/Alt+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
             ),
+            KeybindingProfile::LinuxConsole => String::from(
+                "Quit: q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G/Ctrl+Shift+Q/F12 • Help: F1 (Alt+H) • Scroll: ↑/↓/PgUp/PgDn/Home/End",
+            ),
             KeybindingProfile::Windows => String::from(
                 "Quit: q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Help: F1/Ctrl+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
             ),
@@ -739,13 +776,16 @@ fn startup_help_text(hex_mode: bool, profile: KeybindingProfile) -> String {
 
     match profile {
         KeybindingProfile::MacOs => String::from(
-            "Save: ⌘S/Ctrl+S • Help: ⇧⌘?/Ctrl+H • Quit: ⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: ⌘C/X/V, Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: ⌘A, Shift+Arrows/Shift+PgUp/Shift+PgDn •   Shift+⌥←→/Shift+⌘←→/Shift+⌘↑↓ • Undo: ⌘Z/Ctrl+Z • Redo: ⇧⌘Z/Ctrl+Y • Toggle BOM: Ctrl+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/⌥←→/⌘←→ •   ⌘↑↓/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: ⌥Backspace/⌘Backspace •   Ctrl+Backspace/Ctrl+U",
+            "Save: ⌘S/Ctrl+S • Help: ⇧⌘?/Ctrl+H • Quit: ⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: ⌘C/X/V, Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: ⌘A, Shift+Arrows/Shift+PgUp/Shift+PgDn •   Shift+⌥←→/Shift+⌘←→/Shift+⌘↑↓ • Select-mode: F3/Ctrl+Space • Undo: ⌘Z/Ctrl+Z • Redo: ⇧⌘Z/Ctrl+Y • Toggle BOM: Ctrl+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/⌥←→/⌘←→ •   ⌘↑↓/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: ⌥Backspace/⌘Backspace •   Ctrl+Backspace/Ctrl+U",
         ),
         KeybindingProfile::Linux => String::from(
-            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q •   Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
+            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q •   Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
+        ),
+        KeybindingProfile::LinuxConsole => String::from(
+            "Save: F2/Ctrl+S • Help: F1/Alt+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G/Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V (line fallback on caret) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U • Toggle: Ctrl+B BOM, Ctrl+T tab, Ctrl+W wrap, Ctrl+K invisibles",
         ),
         KeybindingProfile::Windows => String::from(
-            "Save: Ctrl+S • Help: F1/Ctrl+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/Ctrl+←→ •   Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
+            "Save: Ctrl+S • Help: F1/Ctrl+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/Ctrl+←→ •   Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
         ),
     }
 }
@@ -758,6 +798,10 @@ fn unsaved_changes_message(profile: KeybindingProfile) -> String {
         }
         KeybindingProfile::Linux => {
             "unsaved changes: use Ctrl+S to save or Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 to force quit"
+                .to_string()
+        }
+        KeybindingProfile::LinuxConsole => {
+            "unsaved changes: use F2 or Ctrl+S to save, or Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12 to force quit"
                 .to_string()
         }
         KeybindingProfile::Windows => {
@@ -1195,6 +1239,66 @@ mod tests {
             app.document().bytes().expect("bytes should be readable"),
             b"a\nb"
         );
+    }
+
+    #[test]
+    fn linux_console_copy_falls_back_to_current_line_without_sticky_selection() {
+        let mut document = Document::from_bytes(b"ab\ncd\nef".to_vec());
+        document.move_to_byte_offset(4, false);
+        let mut app = AppState::new(document);
+        app.set_keybinding_profile(crate::input::KeybindingProfile::LinuxConsole);
+
+        app.execute_command(Command::Copy)
+            .expect("copy should succeed");
+
+        assert_eq!(app.document().clipboard(), "cd");
+        assert!(app.document().selection().is_caret());
+        assert_eq!(app.document().selection().active.byte_offset, 4);
+    }
+
+    #[test]
+    fn linux_console_cut_falls_back_to_current_line() {
+        let mut document = Document::from_bytes(b"ab\ncd\nef".to_vec());
+        document.move_to_byte_offset(4, false);
+        let mut app = AppState::new(document);
+        app.set_keybinding_profile(crate::input::KeybindingProfile::LinuxConsole);
+
+        app.execute_command(Command::Cut).expect("cut should succeed");
+
+        assert_eq!(app.document().clipboard(), "cd\n");
+        assert_eq!(
+            app.document().bytes().expect("bytes should be readable"),
+            b"ab\nef"
+        );
+    }
+
+    #[test]
+    fn selection_mode_extends_moves_without_shift() {
+        let mut app = AppState::new(Document::from_bytes(b"ab".to_vec()));
+        app.execute_command(Command::ToggleSelectionMode)
+            .expect("toggle selection mode should succeed");
+
+        app.execute_command(Command::Move {
+            direction: MoveCommand::Right,
+            extend: false,
+        })
+        .expect("move should succeed");
+
+        assert!(!app.document().selection().is_caret());
+    }
+
+    #[test]
+    fn copy_turns_off_selection_mode() {
+        let mut document = Document::from_bytes(b"ab".to_vec());
+        document.select_all();
+        let mut app = AppState::new(document);
+        app.execute_command(Command::ToggleSelectionMode)
+            .expect("toggle selection mode should succeed");
+        assert!(app.selection_mode_enabled());
+
+        app.execute_command(Command::Copy)
+            .expect("copy should succeed");
+        assert!(!app.selection_mode_enabled());
     }
 
     #[test]

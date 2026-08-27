@@ -188,6 +188,35 @@ impl Document {
         self.preferred_column = None;
     }
 
+    pub fn select_current_line(&mut self, include_line_ending: bool) -> Result<bool, DocumentError> {
+        self.history.flush_pending();
+        let bytes = self.tree.read_all()?;
+        if bytes.is_empty() {
+            return Ok(false);
+        }
+
+        let caret = self.selection.active.byte_offset.min(bytes.len());
+        let mut start = caret;
+        while start > 0 && bytes[start - 1] != b'\n' {
+            start -= 1;
+        }
+
+        let mut end = caret;
+        while end < bytes.len() && bytes[end] != b'\n' {
+            end += 1;
+        }
+        if include_line_ending && end < bytes.len() {
+            end += 1;
+        }
+
+        if start == end {
+            return Ok(false);
+        }
+        self.selection = Selection::new(Cursor::new(start), Cursor::new(end));
+        self.preferred_column = None;
+        Ok(true)
+    }
+
     pub fn move_left(&mut self, extend: bool) -> Result<(), DocumentError> {
         self.history.flush_pending();
         self.preferred_column = None;

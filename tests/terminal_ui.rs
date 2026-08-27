@@ -263,8 +263,7 @@ fn renderer_columnizes_bulleted_header_segments() {
 
 #[test]
 fn renderer_keeps_split_siblings_in_same_column_order() {
-    let lines =
-        Renderer::wrapped_header_lines(Some("Force quit: A •   B • Save: S • Help: H"), 32);
+    let lines = Renderer::wrapped_header_lines(Some("Force quit: A •   B • Save: S • Help: H"), 32);
     assert_eq!(lines.len(), 2);
     assert!(lines[0].contains("Force quit: A"));
     assert!(lines[1].contains("  B"));
@@ -324,6 +323,26 @@ fn selection_is_visually_highlighted() {
         },
     );
 
-    assert!(rendered.lines[0].contains("\x1b[7mhe\x1b[27m"));
+    assert!(rendered.lines[0].contains("\x1b[7mhe\x1b[0m"));
     assert!(!rendered.lines[0].contains("\x1b[7mhello world"));
+}
+
+#[test]
+fn selecting_line_break_shows_inverted_block() {
+    let mut doc = Document::from_bytes(b"a\nb".to_vec());
+    doc.move_right(false).expect("move should succeed");
+    doc.move_right(true).expect("extend should succeed");
+    let rendered = TextView::render(
+        &doc,
+        TextViewport {
+            first_row: 0,
+            width: 20,
+            height: 2,
+            wrap: false,
+            wrap_column: None,
+            show_invisibles: false,
+        },
+    );
+
+    assert!(rendered.lines[0].contains("\x1b[7m \x1b[0m"));
 }

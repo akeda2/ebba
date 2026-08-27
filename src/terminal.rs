@@ -37,7 +37,8 @@ impl TerminalModeGuard {
     pub fn enter() -> AppResult<Self> {
         enable_raw_mode()?;
         execute!(stdout(), EnterAlternateScreen, EnableBracketedPaste, Hide)?;
-        let keyboard_enhancement_enabled = supports_keyboard_enhancement().unwrap_or(false);
+        let keyboard_enhancement_enabled =
+            supports_keyboard_enhancement().unwrap_or(false) && !is_linux_console_term();
         if keyboard_enhancement_enabled {
             execute!(
                 stdout(),
@@ -48,6 +49,13 @@ impl TerminalModeGuard {
             keyboard_enhancement_enabled,
         })
     }
+}
+
+fn is_linux_console_term() -> bool {
+    cfg!(target_os = "linux")
+        && std::env::var("TERM")
+            .ok()
+            .is_some_and(|term| term.eq_ignore_ascii_case("linux"))
 }
 
 impl Drop for TerminalModeGuard {

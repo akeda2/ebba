@@ -18,6 +18,7 @@ pub struct TextViewport {
 pub struct SelectionSpan {
     pub start_column: usize,
     pub end_column: usize,
+    pub highlight_line_break: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -193,11 +194,14 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
                 let start = sel.start_column.max(segment.start_column);
                 let end = sel.end_column.min(segment.end_column);
                 if start >= end {
-                    return None;
+                    if !(sel.highlight_line_break && segment_index == last_segment) {
+                        return None;
+                    }
                 }
                 Some(SelectionSpan {
                     start_column: start - segment.start_column,
                     end_column: end - segment.start_column,
+                    highlight_line_break: sel.highlight_line_break && segment_index == last_segment,
                 })
             });
 
@@ -366,22 +370,23 @@ fn selection_span_for_line(
     selection_start: usize,
     selection_end: usize,
 ) -> Option<SelectionSpan> {
-    if selection_start == selection_end {
-        return None;
-    }
     let start = selection_start.max(range.start).min(range.end_no_newline);
     let end = selection_end.max(range.start).min(range.end_no_newline);
-    if start >= end {
-        return None;
-    }
 
     let start_width =
         UnicodeWidthStr::width(String::from_utf8_lossy(&bytes[range.start..start]).as_ref());
     let end_width =
         UnicodeWidthStr::width(String::from_utf8_lossy(&bytes[range.start..end]).as_ref());
+    let highlight_line_break = selection_start < range.end_with_newline
+        && selection_end > range.end_no_newline
+        && range.end_with_newline > range.end_no_newline;
+    if start_width >= end_width && !highlight_line_break {
+        return None;
+    }
     Some(SelectionSpan {
         start_column: start_width,
         end_column: end_width,
+        highlight_line_break,
     })
 }
 
@@ -448,7 +453,7 @@ fn render_text_with_selection(
             out.push_str("\x1b[7m");
             inverse_on = true;
         } else if !should_inverse && inverse_on {
-            out.push_str("\x1b[27m");
+            out.push_str("\x1b[0m");
             inverse_on = false;
         }
 
@@ -457,7 +462,11 @@ fn render_text_with_selection(
     }
 
     if inverse_on {
-        out.push_str("\x1b[27m");
+        out.push_str("\x1b[0m");
+    }
+    if used < width && selection.is_some_and(|sel| sel.highlight_line_break) {
+        out.push_str("\x1b[7m \x1b[0m");
+        used += 1;
     }
     if used < width {
         out.push_str(&" ".repeat(width - used));

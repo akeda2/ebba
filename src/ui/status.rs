@@ -13,6 +13,7 @@ pub struct StatusLine {
     pub wrapped_segment: Option<(usize, usize)>,
     pub wrap_column: Option<usize>,
     pub show_invisibles: bool,
+    pub selection_mode: Option<bool>,
     pub message: Option<String>,
 }
 
@@ -32,6 +33,7 @@ impl Default for StatusLine {
             wrapped_segment: None,
             wrap_column: None,
             show_invisibles: false,
+            selection_mode: None,
             message: Some(String::from("ready")),
         }
     }
@@ -58,13 +60,20 @@ impl StatusLine {
         } else {
             "INV:OFF"
         };
+        let selection_mode = self.selection_mode.map(|enabled| {
+            if enabled {
+                "Select-mode:ON"
+            } else {
+                "Select-mode:OFF"
+            }
+        });
         let line_label = if let Some((segment, total)) = self.wrapped_segment {
             format!("Ln {} ({}/{})", self.line, segment, total)
         } else {
             format!("Ln {}", self.line)
         };
         let left = format!(
-            "{} [{}|{}] {}, Col {} / {} TAB:{} {} {} {} {} {}",
+            "{} [{}|{}] {}, Col {} / {} TAB:{} {} {}{} {} {} {}",
             self.filename,
             modified,
             access,
@@ -74,6 +83,9 @@ impl StatusLine {
             self.tab_width,
             wrap,
             invisibles,
+            selection_mode
+                .map(|value| format!(" {value}"))
+                .unwrap_or_default(),
             self.encoding,
             self.line_ending,
             self.bom
@@ -108,5 +120,26 @@ fn fit_to_width(input: &str, width: usize) -> String {
         rendered
     } else {
         format!("{rendered:<width$}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StatusLine;
+
+    #[test]
+    fn render_includes_selection_mode_label() {
+        let on = StatusLine {
+            selection_mode: Some(true),
+            ..StatusLine::default()
+        }
+        .render(200);
+        assert!(on.contains("Select-mode:ON"));
+        let off = StatusLine {
+            selection_mode: Some(false),
+            ..StatusLine::default()
+        }
+        .render(200);
+        assert!(off.contains("Select-mode:OFF"));
     }
 }

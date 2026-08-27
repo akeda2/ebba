@@ -73,7 +73,7 @@ ebba README.md --wrap 80 --invisibles
 - `--wrap [COLUMN]`  Enable wrapping; optional fixed wrap column (for example `--wrap 80`).
 - `--invisibles`  Show invisible characters (space `·`, LF `␊`, CRLF `␍`).
 - `--config <PATH>`  Load YAML config from explicit path.
-- `--keymap <auto|mac|linux|windows>`  Force keybinding profile at startup (useful for cross-platform keymap testing).
+- `--keymap <auto|mac|linux|linux-console|windows>`  Force keybinding profile at startup (useful for cross-platform keymap testing).
 
 `--text` and `--binary` are mutually exclusive.
 
@@ -93,6 +93,7 @@ On Windows, if that file does not exist, ebba falls back to `%APPDATA%\ebba\conf
 - Copy/Cut/Paste: `Ctrl+C`, `Ctrl+X`, `Ctrl+V`
 - Terminal clipboard copy/paste: `Ctrl+Shift+C`, `Ctrl+Shift+V`
 - Select all: `Ctrl+A`
+- Toggle selection mode: `F3`, `Ctrl+Space`
 - Undo/Redo: `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`
 - Word move: `Ctrl+←`, `Ctrl+→`
 - Line move: `Home`, `End`
@@ -103,6 +104,30 @@ On Windows, if that file does not exist, ebba falls back to `%APPDATA%\ebba\conf
 - Toggle tab width (2 → 4 → 8): `Ctrl+T`
 - Toggle wrap: `Ctrl+W`
 - Toggle invisibles: `Ctrl+K`, `Alt+I`
+
+### Linux console profile
+
+Auto-selected on Linux virtual consoles (`TERM=linux`).  
+Adds function-key fallbacks and avoids desktop-terminal-specific assumptions.
+
+- Save: `F2`, `Ctrl+S`
+- Help: `F1`, `Alt+H` (`Ctrl+H` is terminal-dependent in Linux console)
+- Quit: `F10`, `Ctrl+Q`
+- Force quit: `F12`, `Ctrl+Alt+Q`, `Ctrl+Shift+Q`, `Ctrl+G`
+- Copy/Cut/Paste: `Ctrl+C`, `Ctrl+X`, `Ctrl+V`
+- `Ctrl+C`/`Ctrl+X` on a caret (no selection) copies/cuts the whole current line
+- Select all: `Ctrl+A`
+- Toggle selection mode: `F3`, `Ctrl+Space` (while on, move keys extend selection)
+- Undo/Redo: `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`
+- Word move: `Ctrl+←`, `Ctrl+→`
+- Line move: `Home`, `End`
+- Document move: `Ctrl+Home`, `Ctrl+End`
+- Delete previous word: `Ctrl+Backspace`
+- Delete to line start: `Ctrl+U`
+- Toggle BOM: `Ctrl+B`
+- Toggle tab width (2 → 4 → 8): `Ctrl+T`
+- Toggle wrap: `Ctrl+W`
+- Toggle invisibles: `Ctrl+K`
 
 ### Windows profile
 
@@ -116,6 +141,7 @@ Terminal-level copy/paste (`Ctrl+Shift+C/V`) depends on terminal settings.
 - Copy/Cut/Paste: `Ctrl+C`, `Ctrl+X`, `Ctrl+V`
 - Terminal clipboard copy/paste: `Ctrl+Shift+C`, `Ctrl+Shift+V`
 - Select all: `Ctrl+A`
+- Toggle selection mode: `F3`, `Ctrl+Space`
 - Undo/Redo: `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`
 - Word move: `Ctrl+←`, `Ctrl+→`
 - Line move: `Home`, `End`
@@ -138,6 +164,7 @@ Terminal apps on macOS may intercept some `⌘` keys before `ebba` receives them
 - Force quit: `Ctrl+Alt+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, `F12`
 - Copy/Cut/Paste: `⌘C`, `⌘X`, `⌘V` (plus `Ctrl+C/X/V`)
 - Select all: `⌘A` (plus `Ctrl+A`)
+- Toggle selection mode: `F3`, `Ctrl+Space` (terminal-dependent on macOS)
 - Undo/Redo: `⌘Z`, `⇧⌘Z` (plus `Ctrl+Y`)
 - Word move: `⌥←`, `⌥→` (plus `Ctrl+←`, `Ctrl+→`)
 - Line move: `⌘←`, `⌘→`
@@ -155,6 +182,7 @@ Terminal apps on macOS may intercept some `⌘` keys before `ebba` receives them
 - Insert tab / indent selection: `Tab`
 - Outdent selection: `Shift+Tab`
 - Extend selection: add `Shift` to movement keys (arrows, page keys, word/document jumps)
+- Linux console fallback: toggle selection mode with `Ctrl+Space`, then move with arrows/page/home/end
 
 ### Hex mode notes
 

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{env, time::Duration};
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, poll, read};
 
@@ -7,6 +7,7 @@ use crate::command::{AppResult, Command, MoveCommand};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeybindingProfile {
     Linux,
+    LinuxConsole,
     MacOs,
     Windows,
 }
@@ -17,6 +18,8 @@ impl KeybindingProfile {
             Self::MacOs
         } else if cfg!(target_os = "windows") {
             Self::Windows
+        } else if is_linux_console_term() {
+            Self::LinuxConsole
         } else {
             Self::Linux
         }
@@ -151,6 +154,11 @@ pub fn command_from_key_event_with_profile(
         }
     }
 
+    if matches!(code, KeyCode::Null | KeyCode::Char('\0'))
+    {
+        return Some(Command::ToggleSelectionMode);
+    }
+
     match code {
         KeyCode::Char('q') if alt && shift && profile == KeybindingProfile::Linux => {
             Some(Command::ForceQuit)
@@ -163,6 +171,11 @@ pub fn command_from_key_event_with_profile(
             Some(Command::ToggleInvisibles)
         }
         KeyCode::Char('h') | KeyCode::Char('H') if alt && profile == KeybindingProfile::Linux => {
+            Some(Command::ShowHelp)
+        }
+        KeyCode::Char('h') | KeyCode::Char('H')
+            if alt && profile == KeybindingProfile::LinuxConsole =>
+        {
             Some(Command::ShowHelp)
         }
         KeyCode::Char('b') | KeyCode::Char('B') if alt && profile == KeybindingProfile::Linux => {
@@ -180,7 +193,16 @@ pub fn command_from_key_event_with_profile(
         KeyCode::Backspace if alt || ctrl => Some(Command::DeleteWordBackward),
         KeyCode::Backspace => Some(Command::Backspace),
         KeyCode::Delete => Some(Command::Delete),
-        KeyCode::F(1) if profile == KeybindingProfile::Windows => Some(Command::ShowHelp),
+        KeyCode::F(1)
+            if matches!(
+                profile,
+                KeybindingProfile::Windows | KeybindingProfile::LinuxConsole
+            ) =>
+        {
+            Some(Command::ShowHelp)
+        }
+        KeyCode::F(2) if profile == KeybindingProfile::LinuxConsole => Some(Command::Save),
+        KeyCode::F(3) => Some(Command::ToggleSelectionMode),
         KeyCode::F(10) => Some(Command::Quit),
         KeyCode::F(12) => Some(Command::ForceQuit),
         KeyCode::Left if is_word_left(modifiers, profile) => Some(Command::Move {
@@ -285,6 +307,10 @@ fn map_ctrl_shortcut(
     alt: bool,
     _profile: KeybindingProfile,
 ) -> Option<Command> {
+    if ch == ' ' {
+        return Some(Command::ToggleSelectionMode);
+    }
+
     match lower {
         'q' if shift || ch.is_ascii_uppercase() => Some(Command::ForceQuit),
         'q' if alt => Some(Command::ForceQuit),
@@ -325,7 +351,9 @@ fn is_word_left(modifiers: KeyModifiers, profile: KeybindingProfile) -> bool {
     let alt = modifiers.contains(KeyModifiers::ALT);
     match profile {
         KeybindingProfile::MacOs => alt || ctrl,
-        KeybindingProfile::Linux | KeybindingProfile::Windows => ctrl,
+        KeybindingProfile::Linux | KeybindingProfile::LinuxConsole | KeybindingProfile::Windows => {
+            ctrl
+        }
     }
 }
 
@@ -336,7 +364,9 @@ fn is_word_right(modifiers: KeyModifiers, profile: KeybindingProfile) -> bool {
 fn is_line_start(modifiers: KeyModifiers, profile: KeybindingProfile) -> bool {
     match profile {
         KeybindingProfile::MacOs => modifiers.contains(KeyModifiers::SUPER),
-        KeybindingProfile::Linux | KeybindingProfile::Windows => false,
+        KeybindingProfile::Linux | KeybindingProfile::LinuxConsole | KeybindingProfile::Windows => {
+            false
+        }
     }
 }
 
@@ -347,8 +377,17 @@ fn is_line_end(modifiers: KeyModifiers, profile: KeybindingProfile) -> bool {
 fn is_document_start(modifiers: KeyModifiers, profile: KeybindingProfile) -> bool {
     match profile {
         KeybindingProfile::MacOs => modifiers.contains(KeyModifiers::SUPER),
-        KeybindingProfile::Linux | KeybindingProfile::Windows => false,
+        KeybindingProfile::Linux | KeybindingProfile::LinuxConsole | KeybindingProfile::Windows => {
+            false
+        }
     }
+}
+
+fn is_linux_console_term() -> bool {
+    cfg!(target_os = "linux")
+        && env::var("TERM")
+            .ok()
+            .is_some_and(|term| term.eq_ignore_ascii_case("linux"))
 }
 
 fn is_document_end(modifiers: KeyModifiers, profile: KeybindingProfile) -> bool {
