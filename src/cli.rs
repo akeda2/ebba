@@ -6,7 +6,7 @@ use crate::document::encoding::ContentOverride;
 use crate::document::format::LineEndingMode;
 use crate::input::KeybindingProfile;
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum LineEnding {
     Lf,
     Crlf,
@@ -31,25 +31,34 @@ pub struct Cli {
     #[arg(value_name = "FILE", help = "Path to the file to open")]
     pub file: PathBuf,
     #[arg(
+        short = 'e',
         long,
         help = "Save encoding override (utf-8, utf-8-bom, utf-16le-bom, utf-16be-bom)"
     )]
     pub encoding: Option<String>,
     #[arg(
+        short = 'l',
         long,
         value_enum,
         help = "Force line endings on save (defaults to preserving existing endings)"
     )]
     pub line_ending: Option<LineEnding>,
-    #[arg(long, conflicts_with = "binary", help = "Force text mode at startup")]
+    #[arg(
+        short = 't',
+        long,
+        conflicts_with = "binary",
+        help = "Force text mode at startup"
+    )]
     pub text: bool,
     #[arg(
+        short = 'b',
         long,
         conflicts_with = "text",
         help = "Force binary fallback mode (read-only hex view)"
     )]
     pub binary: bool,
     #[arg(
+        short = 'w',
         long,
         num_args = 0..=1,
         value_name = "COLUMN",
@@ -58,13 +67,21 @@ pub struct Cli {
     )]
     pub wrap: Option<Option<usize>>,
     #[arg(
+        short = 'c',
+        long,
+        help = "Center wrapped text after the gutter and enable wrap (uses 80 columns when --wrap has no number)"
+    )]
+    pub center: bool,
+    #[arg(
+        short = 'i',
         long,
         help = "Show invisible characters (spaces as ·, LF as ␊, CRLF as ␍)"
     )]
     pub invisibles: bool,
-    #[arg(long, help = "Load YAML config from this path")]
+    #[arg(short = 'C', long, help = "Load YAML config from this path")]
     pub config: Option<PathBuf>,
     #[arg(
+        short = 'k',
         long,
         value_enum,
         default_value_t = KeymapMode::Auto,
@@ -119,16 +136,16 @@ impl Cli {
     fn key_bindings_help(profile: KeybindingProfile) -> &'static str {
         match profile {
             KeybindingProfile::MacOs => {
-                "Key bindings:\n  Save: ⌘S, Ctrl+S\n  Help: ⇧⌘?, Ctrl+H\n  Quit: ⌘Q, Ctrl+Q, F10\n  Force quit: Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: ⌘Z, ⇧⌘Z, Ctrl+Y\n  Clipboard: ⌘C, ⌘X, ⌘V, Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, ⌘A\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, ⌥+←/→, ⌘+←/→, ⌘+↑/↓, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown, Shift+⌥+←/→, Shift+⌘+←/→, Shift+⌘+↑/↓\n  Toggle selection mode: F3, Ctrl+Space\n  Edit keys: Enter, Backspace, Delete, ⌥Backspace, ⌘Backspace, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh --wrap 80 --invisibles\n  ebba data.bin --binary"
+                "Key bindings:\n  Save: ⌘S, Ctrl+S\n  Help: ⇧⌘?, Ctrl+H\n  Quit: ⌘Q, Ctrl+Q, F10\n  Force quit: Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: ⌘Z, ⇧⌘Z, Ctrl+Y\n  Clipboard: ⌘C, ⌘X, ⌘V, Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, ⌘A\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, ⌥+←/→, ⌘+←/→, ⌘+↑/↓, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown, Shift+⌥+←/→, Shift+⌘+←/→, Shift+⌘+↑/↓\n  Toggle selection mode: F3, Ctrl+Space\n  Edit keys: Enter, Backspace, Delete, ⌥Backspace, ⌘Backspace, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh -w 80 -c -i\n  ebba data.bin -b"
             }
             KeybindingProfile::Linux => {
-                "Key bindings:\n  Save: Ctrl+S\n  Help: Ctrl+H, Alt+H\n  Quit: Ctrl+Q, Alt+Q, F10\n  Force quit: Ctrl+Alt+Q, Alt+Shift+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+A\n  Toggle BOM: Ctrl+B, Alt+B, Ctrl+Shift+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K, Alt+I\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown\n  Toggle selection mode: F3, Ctrl+Space\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh --wrap 80 --invisibles\n  ebba data.bin --binary"
+                "Key bindings:\n  Save: Ctrl+S\n  Help: Ctrl+H, Alt+H\n  Quit: Ctrl+Q, Alt+Q, F10\n  Force quit: Ctrl+Alt+Q, Alt+Shift+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+A\n  Toggle BOM: Ctrl+B, Alt+B, Ctrl+Shift+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K, Alt+I\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown\n  Toggle selection mode: F3, Ctrl+Space\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh -w 80 -c -i\n  ebba data.bin -b"
             }
             KeybindingProfile::LinuxConsole => {
-                "Key bindings:\n  Save: F2, Ctrl+S\n  Help: F1, Alt+H (Ctrl+H terminal-dependent)\n  Quit: F10, Ctrl+Q\n  Force quit: F12, Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+A (Ctrl+C/X copy/cut whole line on caret)\n  Toggle selection mode: F3, Ctrl+Space\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown, or selection mode + move keys\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh --wrap 80 --invisibles\n  ebba data.bin --binary"
+                "Key bindings:\n  Save: F2, Ctrl+S\n  Help: F1, Alt+H (Ctrl+H terminal-dependent)\n  Quit: F10, Ctrl+Q\n  Force quit: F12, Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+A (Ctrl+C/X copy/cut whole line on caret)\n  Toggle selection mode: F3, Ctrl+Space\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown, or selection mode + move keys\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh -w 80 -c -i\n  ebba data.bin -b"
             }
             KeybindingProfile::Windows => {
-                "Key bindings:\n  Save: Ctrl+S\n  Help: F1, Ctrl+H\n  Quit: Ctrl+Q, F10\n  Force quit: Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+A\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown\n  Toggle selection mode: F3, Ctrl+Space\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh --wrap 80 --invisibles\n  ebba data.bin --binary"
+                "Key bindings:\n  Save: Ctrl+S\n  Help: F1, Ctrl+H\n  Quit: Ctrl+Q, F10\n  Force quit: Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+A\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown\n  Toggle selection mode: F3, Ctrl+Space\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh -w 80 -c -i\n  ebba data.bin -b"
             }
         }
     }
@@ -148,6 +165,11 @@ fn requested_keymap_from_args() -> Option<KeymapMode> {
     let mut args = std::env::args_os().skip(1);
     while let Some(arg) = args.next() {
         if let Some(value) = parse_keymap_arg(&arg) {
+            return parse_keymap_mode(&value);
+        }
+        if arg == "-k"
+            && let Some(value) = args.next()
+        {
             return parse_keymap_mode(&value);
         }
         if arg == "--keymap"
@@ -192,6 +214,8 @@ fn parse_keymap_mode(value: &OsString) -> Option<KeymapMode> {
 mod tests {
     use std::{ffi::OsString, path::PathBuf};
 
+    use clap::Parser;
+
     use super::{Cli, KeymapMode, LineEnding, parse_keymap_mode};
     use crate::input::KeybindingProfile;
 
@@ -203,6 +227,7 @@ mod tests {
             text: false,
             binary: false,
             wrap: None,
+            center: false,
             invisibles: false,
             config: None,
             keymap: KeymapMode::Auto,
@@ -235,5 +260,52 @@ mod tests {
             parse_keymap_mode(&OsString::from("windows")),
             Some(KeymapMode::Windows)
         );
+    }
+
+    #[test]
+    fn parses_short_aliases() {
+        let cli = Cli::try_parse_from([
+            "ebba",
+            "README.md",
+            "-e",
+            "utf-8",
+            "-l",
+            "lf",
+            "-t",
+            "-w",
+            "80",
+            "-c",
+            "-i",
+            "-C",
+            "config.yaml",
+            "-k",
+            "linux",
+        ])
+        .expect("short aliases should parse");
+
+        assert_eq!(cli.encoding.as_deref(), Some("utf-8"));
+        assert_eq!(cli.line_ending, Some(LineEnding::Lf));
+        assert!(cli.text);
+        assert_eq!(cli.wrap, Some(Some(80)));
+        assert!(cli.center);
+        assert!(cli.invisibles);
+        assert_eq!(cli.config, Some(PathBuf::from("config.yaml")));
+        assert_eq!(cli.keymap, KeymapMode::Linux);
+    }
+
+    #[test]
+    fn parses_bare_wrap_with_center() {
+        let cli = Cli::try_parse_from(["ebba", "README.md", "--wrap", "--center"])
+            .expect("center with bare wrap should parse");
+        assert_eq!(cli.wrap, Some(None));
+        assert!(cli.center);
+    }
+
+    #[test]
+    fn parses_center_without_wrap() {
+        let cli = Cli::try_parse_from(["ebba", "README.md", "--center"])
+            .expect("center should parse and imply wrapping at runtime");
+        assert!(cli.center);
+        assert_eq!(cli.wrap, None);
     }
 }

@@ -59,21 +59,22 @@ ebba FILE [OPTIONS]
 Example:
 
 ```bash
-ebba README.md --wrap 80 --invisibles
+ebba README.md -w 80 -c -i
 ```
 
 ## Startup options
 
 - `FILE`  
   Path to the file to open.
-- `--encoding <ENCODING>`  Save encoding override: `utf-8`, `utf-8-bom`, `utf-16le-bom`, `utf-16be-bom`.
-- `--line-ending <lf|crlf>`  Force line endings on save (otherwise preserve mode).
-- `--text`  Force text startup mode.
-- `--binary`  Force binary fallback mode (read-only hex view).
-- `--wrap [COLUMN]`  Enable wrapping; optional fixed wrap column (for example `--wrap 80`).
-- `--invisibles`  Show invisible characters (space `·`, LF `␊`, CRLF `␍`).
-- `--config <PATH>`  Load YAML config from explicit path.
-- `--keymap <auto|mac|linux|linux-console|windows>`  Force keybinding profile at startup (useful for cross-platform keymap testing).
+- `-e, --encoding <ENCODING>`  Save encoding override: `utf-8`, `utf-8-bom`, `utf-16le-bom`, `utf-16be-bom`.
+- `-l, --line-ending <lf|crlf>`  Force line endings on save (otherwise preserve mode).
+- `-t, --text`  Force text startup mode.
+- `-b, --binary`  Force binary fallback mode (read-only hex view).
+- `-w, --wrap [COLUMN]`  Enable wrapping; optional fixed wrap column (for example `--wrap 80`).
+- `-c, --center`  Center wrapped text after the gutter and enable wrapping. With bare `--center` (or `--wrap --center`), ebba uses 80 columns (clamped to the terminal width after the gutter).
+- `-i, --invisibles`  Show invisible characters (space `·`, LF `␊`, CRLF `␍`).
+- `-C, --config <PATH>`  Load YAML config from explicit path.
+- `-k, --keymap <auto|mac|linux|linux-console|windows>`  Force keybinding profile at startup (useful for cross-platform keymap testing).
 
 `--text` and `--binary` are mutually exclusive.
 
