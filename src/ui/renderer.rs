@@ -323,8 +323,8 @@ fn single_column_segment(items: &[String], width: usize) -> Vec<String> {
 fn columnize_segment(segment: &str, width: usize) -> Vec<String> {
     let items: Vec<String> = segment
         .split(" • ")
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
+        .map(str::trim_end)
+        .filter(|s| !s.trim().is_empty())
         .map(ToOwned::to_owned)
         .collect();
     if items.is_empty() {

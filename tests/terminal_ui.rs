@@ -263,13 +263,11 @@ fn renderer_columnizes_bulleted_header_segments() {
 
 #[test]
 fn renderer_keeps_split_siblings_in_same_column_order() {
-    let lines = Renderer::wrapped_header_lines(
-        Some("Force quit: A • Force quit: B • Save: S • Help: H"),
-        32,
-    );
+    let lines =
+        Renderer::wrapped_header_lines(Some("Force quit: A •   B • Save: S • Help: H"), 32);
     assert_eq!(lines.len(), 2);
     assert!(lines[0].contains("Force quit: A"));
-    assert!(lines[1].contains("Force quit: B"));
+    assert!(lines[1].contains("  B"));
 }
 
 #[test]
