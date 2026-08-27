@@ -21,6 +21,7 @@ use crate::{
 };
 
 const STARTUP_CONFIRMATION_THRESHOLD_BYTES: usize = 64 * 1024 * 1024;
+const DEFAULT_CENTERED_WRAP_COLUMN: usize = 80;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandDisposition {
@@ -42,6 +43,7 @@ pub struct AppState {
     viewport_columns: usize,
     wrap_enabled: bool,
     wrap_column: Option<usize>,
+    wrap_centered: bool,
     show_invisibles: bool,
     selection_mode: bool,
     keybinding_profile: KeybindingProfile,
@@ -68,6 +70,7 @@ impl AppState {
             viewport_columns: 80,
             wrap_enabled: false,
             wrap_column: None,
+            wrap_centered: false,
             show_invisibles: false,
             selection_mode: false,
             keybinding_profile: KeybindingProfile::current(),
@@ -108,6 +111,35 @@ impl AppState {
 
     pub fn wrap_column(&self) -> Option<usize> {
         self.wrap_column
+    }
+
+    pub fn set_wrap_centered(&mut self, centered: bool) {
+        self.wrap_centered = centered;
+    }
+
+    pub fn wrap_centered(&self) -> bool {
+        self.wrap_centered
+    }
+
+    fn effective_wrap_column(&self) -> Option<usize> {
+        if !self.wrap_enabled {
+            return None;
+        }
+        match (self.wrap_column, self.wrap_centered) {
+            (Some(column), _) => Some(column),
+            (None, true) => Some(DEFAULT_CENTERED_WRAP_COLUMN),
+            (None, false) => None,
+        }
+    }
+
+    fn status_wrap_column(&self) -> Option<usize> {
+        if !self.wrap_enabled {
+            return None;
+        }
+        if self.wrap_centered {
+            return Some(self.wrap_column.unwrap_or(DEFAULT_CENTERED_WRAP_COLUMN));
+        }
+        Some(self.wrap_column.unwrap_or(0))
     }
 
     pub fn set_viewport_rows(&mut self, rows: usize) {
@@ -454,7 +486,7 @@ impl AppState {
             &bytes,
             cursor_offset,
             self.viewport_columns,
-            self.wrap_column,
+            self.effective_wrap_column(),
             delta,
         ) else {
             return Ok(false);
@@ -583,9 +615,10 @@ pub fn run() -> AppResult<()> {
     app_state.set_read_only(read_only);
     app_state.set_keybinding_profile(keybinding_profile);
     app_state.set_show_invisibles(args.invisibles);
+    app_state.set_wrap_centered(args.center);
     match args.wrap {
         None => {
-            app_state.set_wrap_enabled(false);
+            app_state.set_wrap_enabled(args.center);
             app_state.set_wrap_column(None);
         }
         Some(None) => {
@@ -641,11 +674,7 @@ pub fn run() -> AppResult<()> {
                     .to_string(),
                 bom: app_state.status_bom_label().to_string(),
                 tab_width: app_state.tab_width(),
-                wrap_column: if app_state.is_wrap_enabled() {
-                    Some(app_state.wrap_column().unwrap_or(0))
-                } else {
-                    None
-                },
+                wrap_column: app_state.status_wrap_column(),
                 show_invisibles: app_state.show_invisibles(),
                 selection_mode: Some(app_state.selection_mode_enabled()),
                 message: status_message.clone(),
@@ -672,7 +701,8 @@ pub fn run() -> AppResult<()> {
                         mode: RenderMode::Text {
                             document: app_state.document(),
                             wrap: app_state.is_wrap_enabled(),
-                            wrap_column: app_state.wrap_column(),
+                            wrap_column: app_state.effective_wrap_column(),
+                            center_wrapped_text: app_state.wrap_centered(),
                             show_invisibles: app_state.show_invisibles(),
                         },
                         status,
@@ -1393,6 +1423,34 @@ mod tests {
         .expect("third wrapped down should succeed");
         let third = app.document().selection().active.byte_offset;
         assert_eq!(third, 11);
+    }
+
+    #[test]
+    fn centered_wrap_without_column_uses_default_width_for_vertical_moves() {
+        let mut app = AppState::new(Document::from_bytes(
+            [b"a".repeat(90), b"\nxy".to_vec()].concat(),
+        ));
+        app.set_wrap_enabled(true);
+        app.set_wrap_centered(true);
+        app.set_wrap_column(None);
+        app.set_viewport_columns(120);
+
+        app.execute_command(Command::Move {
+            direction: MoveCommand::Down,
+            extend: false,
+        })
+        .expect("wrapped down should succeed");
+        assert_eq!(app.document().selection().active.byte_offset, 80);
+    }
+
+    #[test]
+    fn centered_wrap_without_column_reports_default_status_width() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        app.set_wrap_centered(true);
+        app.set_wrap_enabled(true);
+        app.set_wrap_column(None);
+        assert_eq!(app.status_wrap_column(), Some(80));
     }
 
     #[test]

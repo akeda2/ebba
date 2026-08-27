@@ -13,6 +13,7 @@ pub enum RenderMode<'a> {
         document: &'a Document,
         wrap: bool,
         wrap_column: Option<usize>,
+        center_wrapped_text: bool,
         show_invisibles: bool,
     },
     Hex {
@@ -173,6 +174,7 @@ impl Renderer {
                 document,
                 wrap,
                 wrap_column,
+                center_wrapped_text,
                 show_invisibles,
             } => {
                 let mut text = self.render_text(
@@ -182,6 +184,7 @@ impl Renderer {
                     body_height,
                     wrap,
                     wrap_column,
+                    center_wrapped_text,
                     show_invisibles,
                 );
                 status = status.with_position(
@@ -229,6 +232,7 @@ impl Renderer {
         body_height: usize,
         wrap: bool,
         wrap_column: Option<usize>,
+        center_wrapped_text: bool,
         show_invisibles: bool,
     ) -> TextRenderOutput {
         let previous_scroll = state.scroll_row;
@@ -240,6 +244,7 @@ impl Renderer {
                 height: body_height,
                 wrap,
                 wrap_column,
+                center_wrapped_text,
                 show_invisibles,
             },
         );
@@ -257,6 +262,7 @@ impl Renderer {
                     height: body_height,
                     wrap,
                     wrap_column,
+                    center_wrapped_text,
                     show_invisibles,
                 },
             );

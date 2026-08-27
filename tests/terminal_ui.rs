@@ -20,6 +20,7 @@ fn status_line_is_rendered_on_top_row() {
                 document: &doc,
                 wrap: false,
                 wrap_column: None,
+                center_wrapped_text: false,
                 show_invisibles: false,
             },
             status,
@@ -43,6 +44,7 @@ fn text_mode_always_includes_line_number_gutter() {
             height: 1,
             wrap: false,
             wrap_column: None,
+            center_wrapped_text: false,
             show_invisibles: false,
         },
     );
@@ -60,6 +62,7 @@ fn viewport_clips_rows_based_on_scroll() {
             height: 2,
             wrap: false,
             wrap_column: None,
+            center_wrapped_text: false,
             show_invisibles: false,
         },
     );
@@ -118,6 +121,7 @@ fn renderer_keeps_status_line_when_body_height_is_zero() {
                 document: &doc,
                 wrap: false,
                 wrap_column: None,
+                center_wrapped_text: false,
                 show_invisibles: false,
             },
             status: StatusLine {
@@ -144,6 +148,7 @@ fn gutter_width_scales_with_total_line_count() {
             height: 1,
             wrap: false,
             wrap_column: None,
+            center_wrapped_text: false,
             show_invisibles: false,
         },
     );
@@ -170,6 +175,7 @@ fn text_view_renders_utf8_file_content() {
             height: 2,
             wrap: false,
             wrap_column: None,
+            center_wrapped_text: false,
             show_invisibles: false,
         },
     );
@@ -189,6 +195,7 @@ fn renderer_places_cursor_on_first_text_row_not_status_row() {
                 document: &doc,
                 wrap: false,
                 wrap_column: None,
+                center_wrapped_text: false,
                 show_invisibles: false,
             },
             status: StatusLine::default(),
@@ -210,6 +217,7 @@ fn renderer_places_transient_header_above_status() {
                 document: &doc,
                 wrap: false,
                 wrap_column: None,
+                center_wrapped_text: false,
                 show_invisibles: false,
             },
             status: StatusLine {
@@ -237,6 +245,7 @@ fn renderer_wraps_transient_header_by_width() {
                 document: &doc,
                 wrap: false,
                 wrap_column: None,
+                center_wrapped_text: false,
                 show_invisibles: false,
             },
             status: StatusLine::default(),
@@ -293,6 +302,7 @@ fn wrapped_status_shows_logical_line_and_wrap_segment() {
                 document: &doc,
                 wrap: true,
                 wrap_column: Some(4),
+                center_wrapped_text: false,
                 show_invisibles: false,
             },
             status: StatusLine::default(),
@@ -308,6 +318,35 @@ fn wrapped_status_shows_logical_line_and_wrap_segment() {
 }
 
 #[test]
+fn centered_wrap_shifts_text_but_not_status_or_header_width() {
+    let doc = Document::from_bytes(b"abcdef".to_vec());
+    let mut state = RenderState::new(20, 4);
+    let frame = Renderer.render(
+        &mut state,
+        RenderRequest {
+            mode: RenderMode::Text {
+                document: &doc,
+                wrap: true,
+                wrap_column: Some(4),
+                center_wrapped_text: true,
+                show_invisibles: false,
+            },
+            status: StatusLine {
+                wrap_column: Some(4),
+                ..StatusLine::default()
+            },
+            header_message: Some("header"),
+        },
+    );
+
+    assert_eq!(frame.lines[0], "header");
+    assert_eq!(frame.lines[1], "-".repeat(17));
+    assert_eq!(frame.lines[2].len(), 20);
+    assert!(frame.lines[3].starts_with("   1      abcd"));
+    assert_eq!(frame.cursor, Some((3, 10)));
+}
+
+#[test]
 fn selection_is_visually_highlighted() {
     let mut doc = Document::from_bytes(b"hello world".to_vec());
     doc.extend_selection_to(2);
@@ -319,6 +358,7 @@ fn selection_is_visually_highlighted() {
             height: 1,
             wrap: false,
             wrap_column: None,
+            center_wrapped_text: false,
             show_invisibles: false,
         },
     );
@@ -340,6 +380,7 @@ fn selecting_line_break_shows_inverted_block() {
             height: 2,
             wrap: false,
             wrap_column: None,
+            center_wrapped_text: false,
             show_invisibles: false,
         },
     );

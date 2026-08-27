@@ -11,6 +11,7 @@ pub struct TextViewport {
     pub height: usize,
     pub wrap: bool,
     pub wrap_column: Option<usize>,
+    pub center_wrapped_text: bool,
     pub show_invisibles: bool,
 }
 
@@ -157,6 +158,12 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
         .filter(|column| *column > 0)
         .map(|column| column.min(viewport_text_width))
         .unwrap_or(viewport_text_width);
+    let center_padding = if viewport.center_wrapped_text {
+        viewport_text_width.saturating_sub(text_width) / 2
+    } else {
+        0
+    };
+    let left_padding = " ".repeat(center_padding);
 
     let mut visual_rows: Vec<(usize, bool, String)> = Vec::new();
     let mut cursor_visual_row = 0usize;
@@ -186,7 +193,7 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
                     let relative = cursor_column
                         .saturating_sub(segment.start_column)
                         .min(segment_width);
-                    cursor_col = gutter_width + 1 + relative;
+                    cursor_col = gutter_width + 1 + center_padding + relative;
                 }
             }
 
@@ -250,7 +257,7 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
         } else {
             " ".repeat(gutter_width)
         };
-        lines.push(format!("{gutter} {text}"));
+        lines.push(format!("{gutter} {left_padding}{text}"));
         selection_spans.push(None);
 
         if visual_row == cursor_visual_row {
@@ -543,6 +550,7 @@ mod tests {
                 height: 2,
                 wrap: true,
                 wrap_column: None,
+                center_wrapped_text: false,
                 show_invisibles: false,
             },
         );
@@ -562,6 +570,7 @@ mod tests {
                 height: 3,
                 wrap: true,
                 wrap_column: Some(4),
+                center_wrapped_text: false,
                 show_invisibles: false,
             },
         );
@@ -581,10 +590,49 @@ mod tests {
                 height: 2,
                 wrap: false,
                 wrap_column: None,
+                center_wrapped_text: false,
                 show_invisibles: true,
             },
         );
         assert!(rendered.lines[0].contains("a·b␍"));
         assert!(rendered.lines[1].contains("x␊"));
+    }
+
+    #[test]
+    fn centered_wrap_adds_padding_after_gutter() {
+        let doc = Document::from_bytes(b"abcdefgh".to_vec());
+        let rendered = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 20,
+                height: 2,
+                wrap: true,
+                wrap_column: Some(4),
+                center_wrapped_text: true,
+                show_invisibles: false,
+            },
+        );
+        assert_eq!(rendered.lines[0], "   1      abcd");
+        assert_eq!(rendered.lines[1], "          efgh");
+        assert_eq!(rendered.cursor, Some((0, 10)));
+    }
+
+    #[test]
+    fn centered_wrap_clamps_to_viewport_text_width() {
+        let doc = Document::from_bytes(b"abcd".to_vec());
+        let rendered = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 8,
+                height: 1,
+                wrap: true,
+                wrap_column: Some(80),
+                center_wrapped_text: true,
+                show_invisibles: false,
+            },
+        );
+        assert_eq!(rendered.lines[0], "   1 abc");
     }
 }
