@@ -154,6 +154,12 @@ pub fn command_from_key_event_with_profile(
         }
     }
 
+    if profile == KeybindingProfile::LinuxConsole
+        && matches!(code, KeyCode::Null | KeyCode::Char('\0'))
+    {
+        return Some(Command::ToggleSelectionMode);
+    }
+
     match code {
         KeyCode::Char('q') if alt && shift && profile == KeybindingProfile::Linux => {
             Some(Command::ForceQuit)
@@ -166,6 +172,11 @@ pub fn command_from_key_event_with_profile(
             Some(Command::ToggleInvisibles)
         }
         KeyCode::Char('h') | KeyCode::Char('H') if alt && profile == KeybindingProfile::Linux => {
+            Some(Command::ShowHelp)
+        }
+        KeyCode::Char('h') | KeyCode::Char('H')
+            if alt && profile == KeybindingProfile::LinuxConsole =>
+        {
             Some(Command::ShowHelp)
         }
         KeyCode::Char('b') | KeyCode::Char('B') if alt && profile == KeybindingProfile::Linux => {
@@ -192,11 +203,11 @@ pub fn command_from_key_event_with_profile(
             Some(Command::ShowHelp)
         }
         KeyCode::F(2) if profile == KeybindingProfile::LinuxConsole => Some(Command::Save),
-        KeyCode::F(10) => Some(Command::Quit),
-        KeyCode::F(12) => Some(Command::ForceQuit),
-        KeyCode::Null if ctrl && profile == KeybindingProfile::LinuxConsole => {
+        KeyCode::F(3) if profile == KeybindingProfile::LinuxConsole => {
             Some(Command::ToggleSelectionMode)
         }
+        KeyCode::F(10) => Some(Command::Quit),
+        KeyCode::F(12) => Some(Command::ForceQuit),
         KeyCode::Left if is_word_left(modifiers, profile) => Some(Command::Move {
             direction: MoveCommand::WordLeft,
             extend: shift,

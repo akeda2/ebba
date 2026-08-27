@@ -126,6 +126,10 @@ impl AppState {
         self.show_invisibles
     }
 
+    pub fn selection_mode_enabled(&self) -> bool {
+        self.selection_mode
+    }
+
     pub fn set_keybinding_profile(&mut self, profile: KeybindingProfile) {
         self.keybinding_profile = profile;
     }
@@ -727,6 +731,7 @@ pub fn run() -> AppResult<()> {
             }
             let was_cycle_tab = matches!(&command, Command::CycleTabWidth);
             let was_toggle_bom = matches!(&command, Command::ToggleBom);
+            let was_toggle_selection_mode = matches!(&command, Command::ToggleSelectionMode);
             let was_copy_or_cut = matches!(&command, Command::Copy | Command::Cut);
             match app_state.execute_command(command) {
                 Ok(CommandDisposition::Exit) => return Ok(()),
@@ -734,7 +739,16 @@ pub fn run() -> AppResult<()> {
                     if was_copy_or_cut {
                         export_terminal_clipboard_osc52(app_state.document().clipboard());
                     }
-                    if was_cycle_tab || was_toggle_bom {
+                    if was_toggle_selection_mode {
+                        status_message = Some(format!(
+                            "selection mode: {}",
+                            if app_state.selection_mode_enabled() {
+                                "ON"
+                            } else {
+                                "OFF"
+                            }
+                        ));
+                    } else if was_cycle_tab || was_toggle_bom {
                         status_message = None;
                     } else {
                         status_message = None;
@@ -760,7 +774,7 @@ fn startup_help_text(hex_mode: bool, profile: KeybindingProfile) -> String {
                 "Quit: q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q •   Ctrl+Shift+Q/Ctrl+G/F12 • Help: Ctrl+H/Alt+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
             ),
             KeybindingProfile::LinuxConsole => String::from(
-                "Quit: q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Help: F1/Ctrl+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
+                "Quit: q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G/Ctrl+Shift+Q/F12 • Help: F1 (Alt+H) • Scroll: ↑/↓/PgUp/PgDn/Home/End",
             ),
             KeybindingProfile::Windows => String::from(
                 "Quit: q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Help: F1/Ctrl+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
@@ -776,7 +790,7 @@ fn startup_help_text(hex_mode: bool, profile: KeybindingProfile) -> String {
             "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q •   Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
         ),
         KeybindingProfile::LinuxConsole => String::from(
-            "Save: F2/Ctrl+S • Help: F1/Ctrl+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V (line fallback on caret) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn, Ctrl+Space(toggle mode) • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/Ctrl+←→ •   Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
+            "Save: F2/Ctrl+S • Help: F1/Alt+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G/Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V (line fallback on caret) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn, F3/Ctrl+Space (toggle mode) • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U • Toggle: Ctrl+B BOM, Ctrl+T tab, Ctrl+W wrap, Ctrl+K invisibles",
         ),
         KeybindingProfile::Windows => String::from(
             "Save: Ctrl+S • Help: F1/Ctrl+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/Ctrl+←→ •   Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",

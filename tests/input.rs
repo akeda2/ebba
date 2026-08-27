@@ -209,6 +209,24 @@ fn linux_console_maps_ctrl_space_null_form_to_selection_mode_toggle() {
 }
 
 #[test]
+fn linux_console_maps_ctrl_space_char_nul_form_to_selection_mode_toggle() {
+    let key = KeyEvent::new(KeyCode::Char('\0'), KeyModifiers::NONE);
+    assert_eq!(map_linux_console(key), Some(Command::ToggleSelectionMode));
+}
+
+#[test]
+fn linux_console_maps_f3_to_selection_mode_toggle() {
+    let key = KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE);
+    assert_eq!(map_linux_console(key), Some(Command::ToggleSelectionMode));
+}
+
+#[test]
+fn linux_console_maps_alt_h_to_show_help() {
+    let key = KeyEvent::new(KeyCode::Char('h'), KeyModifiers::ALT);
+    assert_eq!(map_linux_console(key), Some(Command::ShowHelp));
+}
+
+#[test]
 fn linux_console_does_not_consume_linux_alt_aliases() {
     let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::ALT);
     assert_eq!(map_linux_console(key), None);

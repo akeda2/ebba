@@ -110,13 +110,13 @@ Auto-selected on Linux virtual consoles (`TERM=linux`).
 Adds function-key fallbacks and avoids desktop-terminal-specific assumptions.
 
 - Save: `F2`, `Ctrl+S`
-- Help: `F1`, `Ctrl+H`
+- Help: `F1`, `Alt+H` (`Ctrl+H` is terminal-dependent in Linux console)
 - Quit: `F10`, `Ctrl+Q`
 - Force quit: `F12`, `Ctrl+Alt+Q`, `Ctrl+Shift+Q`, `Ctrl+G`
 - Copy/Cut/Paste: `Ctrl+C`, `Ctrl+X`, `Ctrl+V`
 - `Ctrl+C`/`Ctrl+X` on a caret (no selection) copies/cuts the whole current line
 - Select all: `Ctrl+A`
-- Toggle selection mode: `Ctrl+Space` (while on, move keys extend selection)
+- Toggle selection mode: `F3`, `Ctrl+Space` (while on, move keys extend selection)
 - Undo/Redo: `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`
 - Word move: `Ctrl+←`, `Ctrl+→`
 - Line move: `Home`, `End`
