@@ -297,6 +297,7 @@ impl AppState {
                 self.document
                     .copy_selection()
                     .map_err(|error| AppError::Message(error.to_string()))?;
+                self.selection_mode = false;
                 if used_line_fallback {
                     self.document.move_to_byte_offset(fallback_caret, false);
                 }
@@ -1294,6 +1295,20 @@ mod tests {
         .expect("move should succeed");
 
         assert!(!app.document().selection().is_caret());
+    }
+
+    #[test]
+    fn copy_turns_off_selection_mode() {
+        let mut document = Document::from_bytes(b"ab".to_vec());
+        document.select_all();
+        let mut app = AppState::new(document);
+        app.execute_command(Command::ToggleSelectionMode)
+            .expect("toggle selection mode should succeed");
+        assert!(app.selection_mode_enabled());
+
+        app.execute_command(Command::Copy)
+            .expect("copy should succeed");
+        assert!(!app.selection_mode_enabled());
     }
 
     #[test]
