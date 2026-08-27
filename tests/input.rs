@@ -10,11 +10,15 @@ use input::{
 };
 
 fn map_default(key: KeyEvent) -> Option<Command> {
-    command_from_key_event_with_profile(key, KeybindingProfile::Default)
+    command_from_key_event_with_profile(key, KeybindingProfile::Linux)
 }
 
 fn map_macos(key: KeyEvent) -> Option<Command> {
     command_from_key_event_with_profile(key, KeybindingProfile::MacOs)
+}
+
+fn map_windows(key: KeyEvent) -> Option<Command> {
+    command_from_key_event_with_profile(key, KeybindingProfile::Windows)
 }
 
 #[test]
@@ -168,9 +172,21 @@ fn maps_ctrl_backspace_to_delete_word_backward() {
 fn maps_terminal_paste_payload_to_paste_text_command() {
     let event = Event::Paste("hello".to_string());
     assert_eq!(
-        command_from_event_with_profile(event, KeybindingProfile::Default),
+        command_from_event_with_profile(event, KeybindingProfile::Linux),
         Some(Command::PasteText("hello".to_string()))
     );
+}
+
+#[test]
+fn windows_maps_f1_to_show_help() {
+    let key = KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE);
+    assert_eq!(map_windows(key), Some(Command::ShowHelp));
+}
+
+#[test]
+fn windows_does_not_consume_linux_alt_aliases() {
+    let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::ALT);
+    assert_eq!(map_windows(key), None);
 }
 
 #[test]

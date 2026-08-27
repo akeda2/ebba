@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     env, fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Deserializer, de};
@@ -204,6 +204,20 @@ fn resolve_config_path(config_override: Option<PathBuf>) -> Result<PathBuf, Conf
         return Ok(path);
     }
 
+    let home_dir = dirs::home_dir().ok_or_else(|| {
+        ConfigError::PathResolution(
+            "unable to determine home directory for fallback config path".to_string(),
+        )
+    })?;
+
+    if cfg!(target_os = "windows") {
+        return Ok(resolve_windows_config_path(
+            &home_dir,
+            env::var_os("APPDATA").map(PathBuf::from),
+            |path| path.exists(),
+        ));
+    }
+
     if let Some(xdg_config_home) = env::var_os("XDG_CONFIG_HOME")
         && !xdg_config_home.is_empty()
     {
@@ -212,13 +226,26 @@ fn resolve_config_path(config_override: Option<PathBuf>) -> Result<PathBuf, Conf
             .join("config.yaml"));
     }
 
-    let home_dir = dirs::home_dir().ok_or_else(|| {
-        ConfigError::PathResolution(
-            "unable to determine home directory for fallback config path".to_string(),
-        )
-    })?;
+    Ok(default_home_config_path(&home_dir))
+}
 
-    Ok(home_dir.join(".config").join("ebba").join("config.yaml"))
+fn default_home_config_path(home_dir: &Path) -> PathBuf {
+    home_dir.join(".config").join("ebba").join("config.yaml")
+}
+
+fn resolve_windows_config_path(
+    home_dir: &Path,
+    appdata_dir: Option<PathBuf>,
+    exists: impl Fn(&Path) -> bool,
+) -> PathBuf {
+    let home_path = default_home_config_path(home_dir);
+    if exists(&home_path) {
+        return home_path;
+    }
+    if let Some(appdata_dir) = appdata_dir {
+        return appdata_dir.join("ebba").join("config.yaml");
+    }
+    home_path
 }
 
 fn validate_width(value: u8, field: &'static str) -> Result<(), ConfigError> {
@@ -391,13 +418,38 @@ fn parse_duplicate_keybinding_error(error: &serde_yaml::Error) -> Option<String>
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_config_path;
-    use std::path::PathBuf;
+    use super::{resolve_config_path, resolve_windows_config_path};
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn override_path_wins() {
         let override_path = PathBuf::from("custom-config.yaml");
         let resolved = resolve_config_path(Some(override_path.clone())).expect("should resolve");
         assert_eq!(resolved, override_path);
+    }
+
+    #[test]
+    fn windows_prefers_home_config_when_present() {
+        let home = Path::new("/tmp/home");
+        let appdata = Some(PathBuf::from(r"C:\Users\test\AppData\Roaming"));
+        let resolved = resolve_windows_config_path(home, appdata, |path| {
+            path.ends_with(Path::new("/tmp/home/.config/ebba/config.yaml"))
+        });
+        assert_eq!(
+            resolved,
+            PathBuf::from("/tmp/home/.config/ebba/config.yaml")
+        );
+    }
+
+    #[test]
+    fn windows_falls_back_to_appdata_when_home_config_missing() {
+        let home = Path::new("/tmp/home");
+        let appdata = Some(PathBuf::from(r"C:\Users\test\AppData\Roaming"));
+        let resolved = resolve_windows_config_path(home, appdata, |_| false);
+        assert!(
+            resolved.ends_with(Path::new("ebba/config.yaml"))
+                || resolved.ends_with(Path::new(r"ebba\config.yaml"))
+        );
+        assert!(resolved.to_string_lossy().contains("AppData"));
     }
 }

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{ffi::OsString, path::PathBuf};
 
 use clap::{CommandFactory, FromArgMatches, Parser, ValueEnum};
 
@@ -12,12 +12,13 @@ pub enum LineEnding {
     Crlf,
 }
 
-#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
 pub enum KeymapMode {
     #[default]
     Auto,
     Mac,
     Linux,
+    Windows,
 }
 
 #[derive(Debug, Parser)]
@@ -66,7 +67,7 @@ pub struct Cli {
         long,
         value_enum,
         default_value_t = KeymapMode::Auto,
-        help = "Force keybinding profile for testing (auto, mac, linux)"
+        help = "Force keybinding profile for testing (auto, mac, linux, windows)"
     )]
     pub keymap: KeymapMode,
 }
@@ -83,7 +84,9 @@ fn parse_wrap_column(raw: &str) -> Result<usize, String> {
 
 impl Cli {
     pub fn parse_args() -> Self {
-        let profile = KeybindingProfile::current();
+        let profile = requested_keymap_from_args()
+            .map(keymap_mode_to_profile)
+            .unwrap_or_else(KeybindingProfile::current);
         let mut command = Self::command();
         command = command.after_help(Self::key_bindings_help(profile));
         let matches = command.get_matches();
@@ -109,11 +112,7 @@ impl Cli {
     }
 
     pub fn keybinding_profile(&self) -> KeybindingProfile {
-        match self.keymap {
-            KeymapMode::Auto => KeybindingProfile::current(),
-            KeymapMode::Mac => KeybindingProfile::MacOs,
-            KeymapMode::Linux => KeybindingProfile::Default,
-        }
+        keymap_mode_to_profile(self.keymap)
     }
 
     fn key_bindings_help(profile: KeybindingProfile) -> &'static str {
@@ -121,18 +120,70 @@ impl Cli {
             KeybindingProfile::MacOs => {
                 "Key bindings:\n  Save: ⌘S, Ctrl+S\n  Help: ⇧⌘?, Ctrl+H\n  Quit: ⌘Q, Ctrl+Q, F10\n  Force quit: Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: ⌘Z, ⇧⌘Z, Ctrl+Y\n  Clipboard: ⌘C, ⌘X, ⌘V, Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, ⌘A\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, ⌥+←/→, ⌘+←/→, ⌘+↑/↓, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown, Shift+⌥+←/→, Shift+⌘+←/→, Shift+⌘+↑/↓\n  Edit keys: Enter, Backspace, Delete, ⌥Backspace, ⌘Backspace, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh --wrap 80 --invisibles\n  ebba data.bin --binary"
             }
-            KeybindingProfile::Default => {
+            KeybindingProfile::Linux => {
                 "Key bindings:\n  Save: Ctrl+S\n  Help: Ctrl+H, Alt+H\n  Quit: Ctrl+Q, Alt+Q, F10\n  Force quit: Ctrl+Alt+Q, Alt+Shift+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+A\n  Toggle BOM: Ctrl+B, Alt+B, Ctrl+Shift+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K, Alt+I\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh --wrap 80 --invisibles\n  ebba data.bin --binary"
+            }
+            KeybindingProfile::Windows => {
+                "Key bindings:\n  Save: Ctrl+S\n  Help: F1, Ctrl+H\n  Quit: Ctrl+Q, F10\n  Force quit: Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+A\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh --wrap 80 --invisibles\n  ebba data.bin --binary"
             }
         }
     }
 }
 
+fn keymap_mode_to_profile(mode: KeymapMode) -> KeybindingProfile {
+    match mode {
+        KeymapMode::Auto => KeybindingProfile::current(),
+        KeymapMode::Mac => KeybindingProfile::MacOs,
+        KeymapMode::Linux => KeybindingProfile::Linux,
+        KeymapMode::Windows => KeybindingProfile::Windows,
+    }
+}
+
+fn requested_keymap_from_args() -> Option<KeymapMode> {
+    let mut args = std::env::args_os().skip(1);
+    while let Some(arg) = args.next() {
+        if let Some(value) = parse_keymap_arg(&arg) {
+            return parse_keymap_mode(&value);
+        }
+        if arg == "--keymap"
+            && let Some(value) = args.next()
+        {
+            return parse_keymap_mode(&value);
+        }
+    }
+    None
+}
+
+fn parse_keymap_arg(arg: &OsString) -> Option<OsString> {
+    let arg = arg.to_string_lossy();
+    let prefix = "--keymap=";
+    if arg.starts_with(prefix) {
+        Some(OsString::from(&arg[prefix.len()..]))
+    } else {
+        None
+    }
+}
+
+fn parse_keymap_mode(value: &OsString) -> Option<KeymapMode> {
+    let value = value.to_string_lossy();
+    if value.eq_ignore_ascii_case("auto") {
+        Some(KeymapMode::Auto)
+    } else if value.eq_ignore_ascii_case("mac") {
+        Some(KeymapMode::Mac)
+    } else if value.eq_ignore_ascii_case("linux") {
+        Some(KeymapMode::Linux)
+    } else if value.eq_ignore_ascii_case("windows") {
+        Some(KeymapMode::Windows)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{ffi::OsString, path::PathBuf};
 
-    use super::{Cli, KeymapMode, LineEnding};
+    use super::{Cli, KeymapMode, LineEnding, parse_keymap_mode};
     use crate::input::KeybindingProfile;
 
     fn base_cli() -> Cli {
@@ -156,6 +207,17 @@ mod tests {
         assert_eq!(cli.keybinding_profile(), KeybindingProfile::MacOs);
 
         cli.keymap = KeymapMode::Linux;
-        assert_eq!(cli.keybinding_profile(), KeybindingProfile::Default);
+        assert_eq!(cli.keybinding_profile(), KeybindingProfile::Linux);
+
+        cli.keymap = KeymapMode::Windows;
+        assert_eq!(cli.keybinding_profile(), KeybindingProfile::Windows);
+    }
+
+    #[test]
+    fn parses_windows_keymap_mode() {
+        assert_eq!(
+            parse_keymap_mode(&OsString::from("windows")),
+            Some(KeymapMode::Windows)
+        );
     }
 }

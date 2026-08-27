@@ -728,8 +728,11 @@ fn startup_help_text(hex_mode: bool, profile: KeybindingProfile) -> String {
             KeybindingProfile::MacOs => String::from(
                 "Quit: q/⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G • Force quit: Ctrl+Shift+Q/F12 • Help: ⇧⌘?/Ctrl+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
             ),
-            KeybindingProfile::Default => String::from(
+            KeybindingProfile::Linux => String::from(
                 "Quit: q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q • Force quit: Ctrl+Shift+Q/Ctrl+G/F12 • Help: Ctrl+H/Alt+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
+            ),
+            KeybindingProfile::Windows => String::from(
+                "Quit: q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G • Force quit: Ctrl+Shift+Q/F12 • Help: F1/Ctrl+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
             ),
         };
     }
@@ -738,8 +741,11 @@ fn startup_help_text(hex_mode: bool, profile: KeybindingProfile) -> String {
         KeybindingProfile::MacOs => String::from(
             "Save: ⌘S/Ctrl+S • Help: ⇧⌘?/Ctrl+H • Quit: ⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G • Force quit: Ctrl+Shift+Q/F12 • Clipboard: ⌘C/X/V, Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: ⌘A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select: Shift+⌥←→/Shift+⌘←→/Shift+⌘↑↓ • Undo: ⌘Z/Ctrl+Z • Redo: ⇧⌘Z/Ctrl+Y • Toggle BOM: Ctrl+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/⌥←→/⌘←→ • Move: ⌘↑↓/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: ⌥Backspace/⌘Backspace • Delete: Ctrl+Backspace/Ctrl+U",
         ),
-        KeybindingProfile::Default => String::from(
+        KeybindingProfile::Linux => String::from(
             "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q • Force quit: Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
+        ),
+        KeybindingProfile::Windows => String::from(
+            "Save: Ctrl+S • Help: F1/Ctrl+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G • Force quit: Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/Ctrl+←→ • Move: Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
         ),
     }
 }
@@ -750,8 +756,12 @@ fn unsaved_changes_message(profile: KeybindingProfile) -> String {
             "unsaved changes: use ⌘S or Ctrl+S to save, or Ctrl+Alt+Q/Ctrl+G/F12 to force quit"
                 .to_string()
         }
-        KeybindingProfile::Default => {
+        KeybindingProfile::Linux => {
             "unsaved changes: use Ctrl+S to save or Ctrl+Alt+Q/Alt+Shift+Q/Ctrl+G/F12 to force quit"
+                .to_string()
+        }
+        KeybindingProfile::Windows => {
+            "unsaved changes: use Ctrl+S to save or Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12 to force quit"
                 .to_string()
         }
     }

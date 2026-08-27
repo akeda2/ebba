@@ -6,16 +6,19 @@ use crate::command::{AppResult, Command, MoveCommand};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeybindingProfile {
-    Default,
+    Linux,
     MacOs,
+    Windows,
 }
 
 impl KeybindingProfile {
     pub fn current() -> Self {
         if cfg!(target_os = "macos") {
             Self::MacOs
+        } else if cfg!(target_os = "windows") {
+            Self::Windows
         } else {
-            Self::Default
+            Self::Linux
         }
     }
 }
@@ -149,20 +152,20 @@ pub fn command_from_key_event_with_profile(
     }
 
     match code {
-        KeyCode::Char('q') if alt && shift && profile == KeybindingProfile::Default => {
+        KeyCode::Char('q') if alt && shift && profile == KeybindingProfile::Linux => {
             Some(Command::ForceQuit)
         }
-        KeyCode::Char('q') if alt && profile == KeybindingProfile::Default => Some(Command::Quit),
-        KeyCode::Char('Q') if alt && profile == KeybindingProfile::Default => {
+        KeyCode::Char('q') if alt && profile == KeybindingProfile::Linux => Some(Command::Quit),
+        KeyCode::Char('Q') if alt && profile == KeybindingProfile::Linux => {
             Some(Command::ForceQuit)
         }
-        KeyCode::Char('i') | KeyCode::Char('I') if alt && profile == KeybindingProfile::Default => {
+        KeyCode::Char('i') | KeyCode::Char('I') if alt && profile == KeybindingProfile::Linux => {
             Some(Command::ToggleInvisibles)
         }
-        KeyCode::Char('h') | KeyCode::Char('H') if alt && profile == KeybindingProfile::Default => {
+        KeyCode::Char('h') | KeyCode::Char('H') if alt && profile == KeybindingProfile::Linux => {
             Some(Command::ShowHelp)
         }
-        KeyCode::Char('b') | KeyCode::Char('B') if alt && profile == KeybindingProfile::Default => {
+        KeyCode::Char('b') | KeyCode::Char('B') if alt && profile == KeybindingProfile::Linux => {
             Some(Command::ToggleBom)
         }
         KeyCode::Char(ch) if should_insert_char(modifiers, profile) => {
@@ -177,6 +180,7 @@ pub fn command_from_key_event_with_profile(
         KeyCode::Backspace if alt || ctrl => Some(Command::DeleteWordBackward),
         KeyCode::Backspace => Some(Command::Backspace),
         KeyCode::Delete => Some(Command::Delete),
+        KeyCode::F(1) if profile == KeybindingProfile::Windows => Some(Command::ShowHelp),
         KeyCode::F(10) => Some(Command::Quit),
         KeyCode::F(12) => Some(Command::ForceQuit),
         KeyCode::Left if is_word_left(modifiers, profile) => Some(Command::Move {
@@ -321,7 +325,7 @@ fn is_word_left(modifiers: KeyModifiers, profile: KeybindingProfile) -> bool {
     let alt = modifiers.contains(KeyModifiers::ALT);
     match profile {
         KeybindingProfile::MacOs => alt || ctrl,
-        KeybindingProfile::Default => ctrl,
+        KeybindingProfile::Linux | KeybindingProfile::Windows => ctrl,
     }
 }
 
@@ -332,7 +336,7 @@ fn is_word_right(modifiers: KeyModifiers, profile: KeybindingProfile) -> bool {
 fn is_line_start(modifiers: KeyModifiers, profile: KeybindingProfile) -> bool {
     match profile {
         KeybindingProfile::MacOs => modifiers.contains(KeyModifiers::SUPER),
-        KeybindingProfile::Default => false,
+        KeybindingProfile::Linux | KeybindingProfile::Windows => false,
     }
 }
 
@@ -343,7 +347,7 @@ fn is_line_end(modifiers: KeyModifiers, profile: KeybindingProfile) -> bool {
 fn is_document_start(modifiers: KeyModifiers, profile: KeybindingProfile) -> bool {
     match profile {
         KeybindingProfile::MacOs => modifiers.contains(KeyModifiers::SUPER),
-        KeybindingProfile::Default => false,
+        KeybindingProfile::Linux | KeybindingProfile::Windows => false,
     }
 }
 

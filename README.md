@@ -42,6 +42,14 @@ cargo install --path .
 
 `inst.sh` currently runs `cargo install --path .`, sudo-copies `target/release/ebba` to `/usr/local/bin/ebba` for all users, and does optional `gb` integration if available.
 
+### 4) Install on Windows via PowerShell
+
+```powershell
+.\inst.ps1
+```
+
+`inst.ps1` installs with `cargo install --path .` and ensures the user Cargo bin directory is present in the user PATH.
+
 ## Usage
 
 ```bash
@@ -65,13 +73,18 @@ ebba README.md --wrap 80 --invisibles
 - `--wrap [COLUMN]`  Enable wrapping; optional fixed wrap column (for example `--wrap 80`).
 - `--invisibles`  Show invisible characters (space `·`, LF `␊`, CRLF `␍`).
 - `--config <PATH>`  Load YAML config from explicit path.
-- `--keymap <auto|mac|linux>`  Force keybinding profile at startup (useful for cross-platform keymap testing).
+- `--keymap <auto|mac|linux|windows>`  Force keybinding profile at startup (useful for cross-platform keymap testing).
 
 `--text` and `--binary` are mutually exclusive.
 
+## Config file location
+
+Default auto-load path is `~/.config/ebba/config.yaml` on all platforms.  
+On Windows, if that file does not exist, ebba falls back to `%APPDATA%\ebba\config.yaml`.
+
 ## Keybindings
 
-### Linux/other profile
+### Linux profile
 
 - Save: `Ctrl+S`
 - Help: `Ctrl+H`, `Alt+H`
@@ -90,6 +103,29 @@ ebba README.md --wrap 80 --invisibles
 - Toggle tab width (2 → 4 → 8): `Ctrl+T`
 - Toggle wrap: `Ctrl+W`
 - Toggle invisibles: `Ctrl+K`, `Alt+I`
+
+### Windows profile
+
+Targeted for modern VT-capable terminals (for example Windows Terminal).  
+Terminal-level copy/paste (`Ctrl+Shift+C/V`) depends on terminal settings.
+
+- Save: `Ctrl+S`
+- Help: `F1`, `Ctrl+H`
+- Quit: `Ctrl+Q`, `F10`
+- Force quit: `Ctrl+Alt+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, `F12`
+- Copy/Cut/Paste: `Ctrl+C`, `Ctrl+X`, `Ctrl+V`
+- Terminal clipboard copy/paste: `Ctrl+Shift+C`, `Ctrl+Shift+V`
+- Select all: `Ctrl+A`
+- Undo/Redo: `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`
+- Word move: `Ctrl+←`, `Ctrl+→`
+- Line move: `Home`, `End`
+- Document move: `Ctrl+Home`, `Ctrl+End`
+- Delete previous word: `Ctrl+Backspace`
+- Delete to line start: `Ctrl+U`
+- Toggle BOM: `Ctrl+B`
+- Toggle tab width (2 → 4 → 8): `Ctrl+T`
+- Toggle wrap: `Ctrl+W`
+- Toggle invisibles: `Ctrl+K`
 
 ### macOS profile
 
