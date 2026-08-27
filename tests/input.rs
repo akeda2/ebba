@@ -21,6 +21,10 @@ fn map_windows(key: KeyEvent) -> Option<Command> {
     command_from_key_event_with_profile(key, KeybindingProfile::Windows)
 }
 
+fn map_linux_console(key: KeyEvent) -> Option<Command> {
+    command_from_key_event_with_profile(key, KeybindingProfile::LinuxConsole)
+}
+
 #[test]
 fn maps_ctrl_q_to_quit() {
     let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL);
@@ -181,6 +185,33 @@ fn maps_terminal_paste_payload_to_paste_text_command() {
 fn windows_maps_f1_to_show_help() {
     let key = KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE);
     assert_eq!(map_windows(key), Some(Command::ShowHelp));
+}
+
+#[test]
+fn linux_console_maps_function_key_fallbacks() {
+    let help = KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE);
+    assert_eq!(map_linux_console(help), Some(Command::ShowHelp));
+
+    let save = KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE);
+    assert_eq!(map_linux_console(save), Some(Command::Save));
+}
+
+#[test]
+fn linux_console_maps_ctrl_space_to_selection_mode_toggle() {
+    let key = KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL);
+    assert_eq!(map_linux_console(key), Some(Command::ToggleSelectionMode));
+}
+
+#[test]
+fn linux_console_maps_ctrl_space_null_form_to_selection_mode_toggle() {
+    let key = KeyEvent::new(KeyCode::Null, KeyModifiers::CONTROL);
+    assert_eq!(map_linux_console(key), Some(Command::ToggleSelectionMode));
+}
+
+#[test]
+fn linux_console_does_not_consume_linux_alt_aliases() {
+    let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::ALT);
+    assert_eq!(map_linux_console(key), None);
 }
 
 #[test]

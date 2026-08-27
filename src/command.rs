@@ -34,6 +34,7 @@ pub enum Command {
     ToggleBom,
     ToggleWrap,
     ToggleInvisibles,
+    ToggleSelectionMode,
     OutdentSelection,
     Copy,
     Cut,

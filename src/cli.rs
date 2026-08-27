@@ -18,6 +18,7 @@ pub enum KeymapMode {
     Auto,
     Mac,
     Linux,
+    LinuxConsole,
     Windows,
 }
 
@@ -67,7 +68,7 @@ pub struct Cli {
         long,
         value_enum,
         default_value_t = KeymapMode::Auto,
-        help = "Force keybinding profile for testing (auto, mac, linux, windows)"
+        help = "Force keybinding profile for testing (auto, mac, linux, linux-console, windows)"
     )]
     pub keymap: KeymapMode,
 }
@@ -123,6 +124,9 @@ impl Cli {
             KeybindingProfile::Linux => {
                 "Key bindings:\n  Save: Ctrl+S\n  Help: Ctrl+H, Alt+H\n  Quit: Ctrl+Q, Alt+Q, F10\n  Force quit: Ctrl+Alt+Q, Alt+Shift+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+A\n  Toggle BOM: Ctrl+B, Alt+B, Ctrl+Shift+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K, Alt+I\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh --wrap 80 --invisibles\n  ebba data.bin --binary"
             }
+            KeybindingProfile::LinuxConsole => {
+                "Key bindings:\n  Save: F2, Ctrl+S\n  Help: F1, Ctrl+H\n  Quit: F10, Ctrl+Q\n  Force quit: F12, Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+A (Ctrl+C/X copy/cut whole line on caret)\n  Toggle selection mode: Ctrl+Space\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown, or selection mode + move keys\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh --wrap 80 --invisibles\n  ebba data.bin --binary"
+            }
             KeybindingProfile::Windows => {
                 "Key bindings:\n  Save: Ctrl+S\n  Help: F1, Ctrl+H\n  Quit: Ctrl+Q, F10\n  Force quit: Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+A\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh --wrap 80 --invisibles\n  ebba data.bin --binary"
             }
@@ -135,6 +139,7 @@ fn keymap_mode_to_profile(mode: KeymapMode) -> KeybindingProfile {
         KeymapMode::Auto => KeybindingProfile::current(),
         KeymapMode::Mac => KeybindingProfile::MacOs,
         KeymapMode::Linux => KeybindingProfile::Linux,
+        KeymapMode::LinuxConsole => KeybindingProfile::LinuxConsole,
         KeymapMode::Windows => KeybindingProfile::Windows,
     }
 }
@@ -172,6 +177,10 @@ fn parse_keymap_mode(value: &OsString) -> Option<KeymapMode> {
         Some(KeymapMode::Mac)
     } else if value.eq_ignore_ascii_case("linux") {
         Some(KeymapMode::Linux)
+    } else if value.eq_ignore_ascii_case("linux-console")
+        || value.eq_ignore_ascii_case("linux_console")
+    {
+        Some(KeymapMode::LinuxConsole)
     } else if value.eq_ignore_ascii_case("windows") {
         Some(KeymapMode::Windows)
     } else {
@@ -209,12 +218,19 @@ mod tests {
         cli.keymap = KeymapMode::Linux;
         assert_eq!(cli.keybinding_profile(), KeybindingProfile::Linux);
 
+        cli.keymap = KeymapMode::LinuxConsole;
+        assert_eq!(cli.keybinding_profile(), KeybindingProfile::LinuxConsole);
+
         cli.keymap = KeymapMode::Windows;
         assert_eq!(cli.keybinding_profile(), KeybindingProfile::Windows);
     }
 
     #[test]
-    fn parses_windows_keymap_mode() {
+    fn parses_explicit_keymap_modes() {
+        assert_eq!(
+            parse_keymap_mode(&OsString::from("linux-console")),
+            Some(KeymapMode::LinuxConsole)
+        );
         assert_eq!(
             parse_keymap_mode(&OsString::from("windows")),
             Some(KeymapMode::Windows)
