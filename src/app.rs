@@ -733,7 +733,6 @@ pub fn run() -> AppResult<()> {
             }
             let was_cycle_tab = matches!(&command, Command::CycleTabWidth);
             let was_toggle_bom = matches!(&command, Command::ToggleBom);
-            let was_toggle_selection_mode = matches!(&command, Command::ToggleSelectionMode);
             let was_copy_or_cut = matches!(&command, Command::Copy | Command::Cut);
             match app_state.execute_command(command) {
                 Ok(CommandDisposition::Exit) => return Ok(()),
@@ -741,16 +740,7 @@ pub fn run() -> AppResult<()> {
                     if was_copy_or_cut {
                         export_terminal_clipboard_osc52(app_state.document().clipboard());
                     }
-                    if was_toggle_selection_mode {
-                        status_message = Some(format!(
-                            "selection mode: {}",
-                            if app_state.selection_mode_enabled() {
-                                "ON"
-                            } else {
-                                "OFF"
-                            }
-                        ));
-                    } else if was_cycle_tab || was_toggle_bom {
+                    if was_cycle_tab || was_toggle_bom {
                         status_message = None;
                     } else {
                         status_message = None;
