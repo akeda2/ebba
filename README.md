@@ -93,6 +93,7 @@ On Windows, if that file does not exist, ebba falls back to `%APPDATA%\ebba\conf
 - Copy/Cut/Paste: `Ctrl+C`, `Ctrl+X`, `Ctrl+V`
 - Terminal clipboard copy/paste: `Ctrl+Shift+C`, `Ctrl+Shift+V`
 - Select all: `Ctrl+A`
+- Toggle selection mode: `F3`, `Ctrl+Space`
 - Undo/Redo: `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`
 - Word move: `Ctrl+←`, `Ctrl+→`
 - Line move: `Home`, `End`
@@ -140,6 +141,7 @@ Terminal-level copy/paste (`Ctrl+Shift+C/V`) depends on terminal settings.
 - Copy/Cut/Paste: `Ctrl+C`, `Ctrl+X`, `Ctrl+V`
 - Terminal clipboard copy/paste: `Ctrl+Shift+C`, `Ctrl+Shift+V`
 - Select all: `Ctrl+A`
+- Toggle selection mode: `F3`, `Ctrl+Space`
 - Undo/Redo: `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`
 - Word move: `Ctrl+←`, `Ctrl+→`
 - Line move: `Home`, `End`
@@ -162,6 +164,7 @@ Terminal apps on macOS may intercept some `⌘` keys before `ebba` receives them
 - Force quit: `Ctrl+Alt+Q`, `Ctrl+Shift+Q`, `Ctrl+G`, `F12`
 - Copy/Cut/Paste: `⌘C`, `⌘X`, `⌘V` (plus `Ctrl+C/X/V`)
 - Select all: `⌘A` (plus `Ctrl+A`)
+- Toggle selection mode: `F3`, `Ctrl+Space` (terminal-dependent on macOS)
 - Undo/Redo: `⌘Z`, `⇧⌘Z` (plus `Ctrl+Y`)
 - Word move: `⌥←`, `⌥→` (plus `Ctrl+←`, `Ctrl+→`)
 - Line move: `⌘←`, `⌘→`

@@ -154,8 +154,7 @@ pub fn command_from_key_event_with_profile(
         }
     }
 
-    if profile == KeybindingProfile::LinuxConsole
-        && matches!(code, KeyCode::Null | KeyCode::Char('\0'))
+    if matches!(code, KeyCode::Null | KeyCode::Char('\0'))
     {
         return Some(Command::ToggleSelectionMode);
     }
@@ -203,9 +202,7 @@ pub fn command_from_key_event_with_profile(
             Some(Command::ShowHelp)
         }
         KeyCode::F(2) if profile == KeybindingProfile::LinuxConsole => Some(Command::Save),
-        KeyCode::F(3) if profile == KeybindingProfile::LinuxConsole => {
-            Some(Command::ToggleSelectionMode)
-        }
+        KeyCode::F(3) => Some(Command::ToggleSelectionMode),
         KeyCode::F(10) => Some(Command::Quit),
         KeyCode::F(12) => Some(Command::ForceQuit),
         KeyCode::Left if is_word_left(modifiers, profile) => Some(Command::Move {
@@ -308,9 +305,9 @@ fn map_ctrl_shortcut(
     ch: char,
     shift: bool,
     alt: bool,
-    profile: KeybindingProfile,
+    _profile: KeybindingProfile,
 ) -> Option<Command> {
-    if profile == KeybindingProfile::LinuxConsole && ch == ' ' {
+    if ch == ' ' {
         return Some(Command::ToggleSelectionMode);
     }
 

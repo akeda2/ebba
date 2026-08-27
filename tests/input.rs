@@ -221,6 +221,30 @@ fn linux_console_maps_f3_to_selection_mode_toggle() {
 }
 
 #[test]
+fn linux_maps_select_mode_toggle_shortcuts() {
+    let ctrl_space = KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL);
+    assert_eq!(map_default(ctrl_space), Some(Command::ToggleSelectionMode));
+    let f3 = KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE);
+    assert_eq!(map_default(f3), Some(Command::ToggleSelectionMode));
+}
+
+#[test]
+fn windows_maps_select_mode_toggle_shortcuts() {
+    let ctrl_space = KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL);
+    assert_eq!(map_windows(ctrl_space), Some(Command::ToggleSelectionMode));
+    let f3 = KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE);
+    assert_eq!(map_windows(f3), Some(Command::ToggleSelectionMode));
+}
+
+#[test]
+fn macos_maps_select_mode_toggle_shortcuts() {
+    let ctrl_space = KeyEvent::new(KeyCode::Char(' '), KeyModifiers::CONTROL);
+    assert_eq!(map_macos(ctrl_space), Some(Command::ToggleSelectionMode));
+    let f3 = KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE);
+    assert_eq!(map_macos(f3), Some(Command::ToggleSelectionMode));
+}
+
+#[test]
 fn linux_console_maps_alt_h_to_show_help() {
     let key = KeyEvent::new(KeyCode::Char('h'), KeyModifiers::ALT);
     assert_eq!(map_linux_console(key), Some(Command::ShowHelp));
