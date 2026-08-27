@@ -291,7 +291,7 @@ impl AppState {
                 {
                     used_line_fallback = self
                         .document
-                        .select_current_line()
+                        .select_current_line(false)
                         .map_err(|error| AppError::Message(error.to_string()))?;
                 }
                 self.document
@@ -311,7 +311,7 @@ impl AppState {
                 {
                     let _ = self
                         .document
-                        .select_current_line()
+                        .select_current_line(true)
                         .map_err(|error| AppError::Message(error.to_string()))?;
                 }
                 self.document
@@ -1259,7 +1259,7 @@ mod tests {
         app.execute_command(Command::Copy)
             .expect("copy should succeed");
 
-        assert_eq!(app.document().clipboard(), "cd\n");
+        assert_eq!(app.document().clipboard(), "cd");
         assert!(app.document().selection().is_caret());
         assert_eq!(app.document().selection().active.byte_offset, 4);
     }

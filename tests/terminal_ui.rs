@@ -323,6 +323,26 @@ fn selection_is_visually_highlighted() {
         },
     );
 
-    assert!(rendered.lines[0].contains("\x1b[7mhe\x1b[27m"));
+    assert!(rendered.lines[0].contains("\x1b[7mhe\x1b[0m"));
     assert!(!rendered.lines[0].contains("\x1b[7mhello world"));
+}
+
+#[test]
+fn selecting_line_break_shows_inverted_block() {
+    let mut doc = Document::from_bytes(b"a\nb".to_vec());
+    doc.move_right(false).expect("move should succeed");
+    doc.move_right(true).expect("extend should succeed");
+    let rendered = TextView::render(
+        &doc,
+        TextViewport {
+            first_row: 0,
+            width: 20,
+            height: 2,
+            wrap: false,
+            wrap_column: None,
+            show_invisibles: false,
+        },
+    );
+
+    assert!(rendered.lines[0].contains("\x1b[7m \x1b[0m"));
 }

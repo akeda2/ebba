@@ -188,7 +188,7 @@ impl Document {
         self.preferred_column = None;
     }
 
-    pub fn select_current_line(&mut self) -> Result<bool, DocumentError> {
+    pub fn select_current_line(&mut self, include_line_ending: bool) -> Result<bool, DocumentError> {
         self.history.flush_pending();
         let bytes = self.tree.read_all()?;
         if bytes.is_empty() {
@@ -205,7 +205,7 @@ impl Document {
         while end < bytes.len() && bytes[end] != b'\n' {
             end += 1;
         }
-        if end < bytes.len() {
+        if include_line_ending && end < bytes.len() {
             end += 1;
         }
 
