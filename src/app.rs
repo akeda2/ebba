@@ -546,6 +546,7 @@ pub fn run() -> AppResult<()> {
             .map_err(|error| AppError::Message(error.to_string()))?;
         Some(match config.default_line_ending {
             ConfigLineEnding::Lf => LineEndingMode::Lf,
+            ConfigLineEnding::Cr => LineEndingMode::Cr,
             ConfigLineEnding::Crlf => LineEndingMode::Crlf,
         })
     } else {

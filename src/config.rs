@@ -11,6 +11,7 @@ use thiserror::Error;
 #[serde(rename_all = "snake_case")]
 pub enum LineEnding {
     Lf,
+    Cr,
     Crlf,
 }
 

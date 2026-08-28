@@ -243,6 +243,7 @@ fn stream_write(
     if pending_carriage_return {
         let terminator: &[u8] = match line_ending_mode {
             LineEndingMode::Lf => b"\n",
+            LineEndingMode::Cr => b"\r",
             LineEndingMode::Crlf => b"\r\n",
             LineEndingMode::Preserve => b"\r",
         };
@@ -278,6 +279,7 @@ pub fn normalize_line_endings_buffer(input: &[u8], mode: LineEndingMode) -> Vec<
     if pending_carriage_return {
         match mode {
             LineEndingMode::Lf => output.push(b'\n'),
+            LineEndingMode::Cr => output.push(b'\r'),
             LineEndingMode::Crlf => output.extend_from_slice(b"\r\n"),
             LineEndingMode::Preserve => output.push(b'\r'),
         }
@@ -301,6 +303,7 @@ fn normalize_line_endings(
         if input.first() == Some(&b'\n') {
             match mode {
                 LineEndingMode::Lf => output.push(b'\n'),
+                LineEndingMode::Cr => output.push(b'\r'),
                 LineEndingMode::Crlf => output.extend_from_slice(b"\r\n"),
                 LineEndingMode::Preserve => output.extend_from_slice(b"\r\n"),
             }
@@ -310,6 +313,7 @@ fn normalize_line_endings(
             // it's its own line terminator, so normalize it like any other.
             match mode {
                 LineEndingMode::Lf => output.push(b'\n'),
+                LineEndingMode::Cr => output.push(b'\r'),
                 LineEndingMode::Crlf => output.extend_from_slice(b"\r\n"),
                 LineEndingMode::Preserve => output.push(b'\r'),
             }
@@ -327,6 +331,7 @@ fn normalize_line_endings(
                 if input[idx + 1] == b'\n' {
                     match mode {
                         LineEndingMode::Lf => output.push(b'\n'),
+                        LineEndingMode::Cr => output.push(b'\r'),
                         LineEndingMode::Crlf => output.extend_from_slice(b"\r\n"),
                         LineEndingMode::Preserve => output.extend_from_slice(b"\r\n"),
                     }
@@ -338,6 +343,7 @@ fn normalize_line_endings(
                 // mode rather than leaving a stray, un-converted `\r`.
                 match mode {
                     LineEndingMode::Lf => output.push(b'\n'),
+                    LineEndingMode::Cr => output.push(b'\r'),
                     LineEndingMode::Crlf => output.extend_from_slice(b"\r\n"),
                     LineEndingMode::Preserve => output.push(b'\r'),
                 }
@@ -345,6 +351,10 @@ fn normalize_line_endings(
             }
             b'\n' if mode == LineEndingMode::Crlf => {
                 output.extend_from_slice(b"\r\n");
+                idx += 1;
+            }
+            b'\n' if mode == LineEndingMode::Cr => {
+                output.push(b'\r');
                 idx += 1;
             }
             byte => {

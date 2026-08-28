@@ -67,12 +67,12 @@ ebba README.md -w 80 -c -i
 - `FILE`  
   Path to the file to open.
 - `-e, --encoding <ENCODING>`  Save encoding override: `utf-8`, `utf-8-bom`, `utf-16le-bom`, `utf-16be-bom`.
-- `-l, --line-ending <lf|crlf>`  Force line endings on save (otherwise preserve mode).
+- `-l, --line-ending <lf|cr|crlf>`  Force line endings on save (otherwise preserve mode).
 - `-t, --text`  Force text startup mode.
 - `-b, --binary`  Force binary fallback mode (read-only hex view).
 - `-w, --wrap [COLUMN]`  Enable wrapping; optional fixed wrap column (for example `--wrap 80`).
 - `-c, --center`  Center wrapped text after the gutter and enable wrapping. With bare `--center` (or `--wrap --center`), ebba uses 80 columns (clamped to the terminal width after the gutter).
-- `-i, --invisibles`  Show invisible characters (space `·`, LF `␊`, CRLF `␍`).
+- `-i, --invisibles`  Show invisible characters (space `·`, LF `␊`, CR `␍`, CRLF `␍␊`).
 - `-C, --config <PATH>`  Load YAML config from explicit path.
 - `-k, --keymap <auto|mac|linux|linux-console|windows>`  Force keybinding profile at startup (useful for cross-platform keymap testing).
 
@@ -83,9 +83,9 @@ ebba README.md -w 80 -c -i
 - **Navigation & rendering**: `\n`, `\r\n`, and bare `\r` (old Mac-style) are all treated as line breaks for cursor movement, selection, indent/outdent, and rendering — including files with mixed endings. The underlying bytes are left untouched (see Preserve below), so this only affects how the buffer is navigated/displayed, not what's stored.
 - **Typing/paste normalization**: whenever text you type (`Enter`) or paste contains a newline, it is rewritten to match the file's own dominant line ending before insertion. Pasting `\n`-terminated text into a CRLF file produces `\r\n`; pasting terminal-supplied bare `\r` (a known quirk of some terminals, e.g. Windows Terminal under WSL) into an LF file produces `\n`. This keeps a consistently-ended file from becoming mixed by a paste.
 - **Status bar indicator**: shows `LF`, `CRLF`, `CR`, or `MIXED`, recomputed live from the current buffer content (not just a snapshot from when the file was opened), so it always reflects the real state of the document as you edit.
-- **Save modes** (`-l, --line-ending <lf|crlf>` or `default_line_ending` in config):
+- **Save modes** (`-l, --line-ending <lf|cr|crlf>` or `default_line_ending` in config):
   - Default is **Preserve**: bytes are saved exactly as they are in the buffer.
-  - `lf`/`crlf` **forces** the whole buffer onto that convention immediately on load (not only at save time), converting any `\r\n`/bare `\r` accordingly, so the in-editor buffer and status indicator match the forced mode right away; saving simply persists that already-normalized content.
+  - `lf`/`cr`/`crlf` **forces** the whole buffer onto that convention immediately on load (not only at save time), converting any `\r\n`/bare `\r`/`\n` accordingly, so the in-editor buffer and status indicator match the forced mode right away; saving simply persists that already-normalized content.
 
 ## Config file location
 
