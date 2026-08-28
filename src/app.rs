@@ -10,7 +10,7 @@ use crate::{
         Document,
         encoding::{DetectionOptions, StartupDecision, StartupPayload, detect_startup_mode},
         format::LineEndingMode,
-        save::{SaveEncoding, SaveError, SaveOverrides},
+        save::{SaveEncoding, SaveError, SaveOverrides, normalize_line_endings_buffer},
     },
     input::{EventLoop, KeybindingProfile},
     terminal::{Terminal, TerminalModeGuard},
@@ -526,6 +526,18 @@ fn apply_hex_scroll(state: &mut RenderState, direction: MoveCommand, total_rows:
     state.scroll_row != before
 }
 
+/// Applies a forced `--line-ending`/config line-ending mode to freshly
+/// loaded text bytes, so the in-editor buffer (and its status-bar
+/// indicator) reflects the forced convention immediately rather than only
+/// once the file is saved. Leaves bytes untouched when no mode is forced
+/// (i.e. `Preserve`, the default).
+fn normalize_loaded_text_bytes(bytes: Vec<u8>, forced_mode: Option<LineEndingMode>) -> Vec<u8> {
+    match forced_mode {
+        Some(mode) => normalize_line_endings_buffer(&bytes, mode),
+        None => bytes,
+    }
+}
+
 pub fn run() -> AppResult<()> {
     let args = Cli::parse_args();
     let keybinding_profile = args.keybinding_profile();
@@ -572,11 +584,20 @@ pub fn run() -> AppResult<()> {
         ..DetectionOptions::default()
     };
     let startup = detect_startup_mode(&bytes, options);
+    let forced_line_ending_mode =
+        line_ending_override.filter(|mode| *mode != LineEndingMode::Preserve);
     match startup {
         StartupDecision::Ready(plan) => {
             document = match plan.payload {
-                StartupPayload::DecodedText { text, .. } => Document::from_bytes(text.into_bytes()),
-                StartupPayload::BytePreservingText { bytes } => Document::from_bytes(bytes),
+                StartupPayload::DecodedText { text, .. } => {
+                    Document::from_bytes(normalize_loaded_text_bytes(
+                        text.into_bytes(),
+                        forced_line_ending_mode,
+                    ))
+                }
+                StartupPayload::BytePreservingText { bytes } => Document::from_bytes(
+                    normalize_loaded_text_bytes(bytes, forced_line_ending_mode),
+                ),
                 StartupPayload::HexReadOnly { bytes } => {
                     hex_mode = true;
                     read_only = true;
@@ -588,8 +609,15 @@ pub fn run() -> AppResult<()> {
         }
         StartupDecision::RequiresConfirmation(pending) => {
             document = match pending.proposed.payload {
-                StartupPayload::DecodedText { text, .. } => Document::from_bytes(text.into_bytes()),
-                StartupPayload::BytePreservingText { bytes } => Document::from_bytes(bytes),
+                StartupPayload::DecodedText { text, .. } => {
+                    Document::from_bytes(normalize_loaded_text_bytes(
+                        text.into_bytes(),
+                        forced_line_ending_mode,
+                    ))
+                }
+                StartupPayload::BytePreservingText { bytes } => Document::from_bytes(
+                    normalize_loaded_text_bytes(bytes, forced_line_ending_mode),
+                ),
                 StartupPayload::HexReadOnly { bytes } => {
                     hex_mode = true;
                     read_only = true;
@@ -954,15 +982,24 @@ fn wrapped_vertical_target_offset(
 fn wrap_line_ranges(bytes: &[u8]) -> Vec<WrapLineRange> {
     let mut ranges = Vec::new();
     let mut start = 0usize;
+    let mut index = 0usize;
 
-    for (index, byte) in bytes.iter().enumerate() {
-        if *byte == b'\n' {
-            ranges.push(WrapLineRange {
-                start,
-                end_no_newline: index,
-                end_with_newline: index + 1,
-            });
-            start = index + 1;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\r' if bytes.get(index + 1) == Some(&b'\n') => {
+                // Part of a CRLF pair; the `\n` branch below closes the line.
+                index += 1;
+            }
+            b'\n' | b'\r' => {
+                ranges.push(WrapLineRange {
+                    start,
+                    end_no_newline: index,
+                    end_with_newline: index + 1,
+                });
+                index += 1;
+                start = index;
+            }
+            _ => index += 1,
         }
     }
 
@@ -1180,6 +1217,83 @@ mod tests {
             app.document().bytes().expect("bytes should be readable"),
             b"hello"
         );
+    }
+
+    #[test]
+    fn paste_text_normalizes_cr_and_crlf_line_endings() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        app.execute_command(Command::PasteText("one\rtwo\r\nthree\r".to_string()))
+            .expect("paste text should succeed");
+        assert_eq!(
+            app.document().bytes().expect("bytes should be readable"),
+            b"one\ntwo\nthree\n"
+        );
+    }
+
+    #[test]
+    fn paste_text_matches_documents_dominant_crlf_ending() {
+        let document = Document::from_bytes(b"existing\r\nlines\r\n".to_vec());
+        let mut app = AppState::new(document);
+        app.execute_command(Command::Move {
+            direction: MoveCommand::DocumentEnd,
+            extend: false,
+        })
+        .expect("move should succeed");
+        app.execute_command(Command::PasteText("pasted\nmore\n".to_string()))
+            .expect("paste text should succeed");
+        assert_eq!(
+            app.document().bytes().expect("bytes should be readable"),
+            b"existing\r\nlines\r\npasted\r\nmore\r\n"
+        );
+    }
+
+    #[test]
+    fn line_ending_indicator_reflects_live_edits_not_stale_snapshot() {
+        use crate::document::format::{LineEndingIndicator, LineEndingMode, analyze_line_endings};
+
+        // Start from a pure-LF document but seed a deliberately stale/wrong
+        // snapshot (as if metadata was captured at a different point in
+        // time) to prove the indicator is recomputed from current content.
+        let mut document = Document::from_bytes(b"a\nb\n".to_vec());
+        document.configure_save_metadata(
+            document.detected_encoding(),
+            analyze_line_endings(b"a\r\nb\r\r\n".to_vec().as_slice(), LineEndingMode::Preserve),
+        );
+        assert_eq!(document.line_endings().indicator(), LineEndingIndicator::Lf);
+
+        let mut app = AppState::new(document);
+        app.execute_command(Command::Move {
+            direction: MoveCommand::DocumentEnd,
+            extend: false,
+        })
+        .expect("move should succeed");
+        app.execute_command(Command::PasteText("\rc\r\n".to_string()))
+            .expect("paste text should succeed");
+        // The pasted mixed endings are normalized to the dominant (LF)
+        // convention, and the live indicator still reports LF, not the
+        // stale MIXED snapshot captured above.
+        assert_eq!(
+            app.document().line_endings().indicator(),
+            LineEndingIndicator::Lf
+        );
+    }
+
+    #[test]
+    fn normalize_loaded_text_bytes_forces_requested_mode() {
+        use crate::document::format::LineEndingMode;
+
+        let mixed = b"a\nb\r\nc\rd".to_vec();
+        assert_eq!(
+            super::normalize_loaded_text_bytes(mixed.clone(), Some(LineEndingMode::Lf)),
+            b"a\nb\nc\nd".to_vec()
+        );
+        assert_eq!(
+            super::normalize_loaded_text_bytes(mixed.clone(), Some(LineEndingMode::Crlf)),
+            b"a\r\nb\r\nc\r\nd".to_vec()
+        );
+        // No forced mode (Preserve/default) leaves bytes untouched.
+        assert_eq!(super::normalize_loaded_text_bytes(mixed.clone(), None), mixed);
     }
 
     #[test]

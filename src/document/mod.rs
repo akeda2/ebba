@@ -4,7 +4,9 @@ use thiserror::Error;
 
 use crate::document::cursor::Cursor;
 use crate::document::encoding::DetectedEncoding;
-use crate::document::format::{LineEndingMetadata, LineEndingMode, analyze_line_endings};
+use crate::document::format::{
+    LineEnding, LineEndingMetadata, LineEndingMode, analyze_line_endings, is_line_terminator,
+};
 use crate::document::piece_tree::{PieceTree, PieceTreeError, VerticalDirection};
 use crate::document::save::{SaveError, SaveOverrides, save_piece_tree_atomic};
 use crate::document::selection::Selection;
@@ -104,8 +106,16 @@ impl Document {
         self.persistence.detected_encoding
     }
 
-    pub fn line_endings(&self) -> &LineEndingMetadata {
-        &self.persistence.line_endings
+    /// Returns line-ending metadata for display (status bar). The `mode`
+    /// reflects the configured save behavior (Preserve/Lf/Crlf), but the
+    /// `stats` are recomputed from the document's *current* content so the
+    /// `MIXED` indicator stays accurate as the user types or pastes, rather
+    /// than reflecting a stale snapshot from when the file was opened.
+    pub fn line_endings(&self) -> LineEndingMetadata {
+        match self.tree.read_all() {
+            Ok(bytes) => analyze_line_endings(&bytes, self.persistence.line_endings.mode),
+            Err(_) => self.persistence.line_endings.clone(),
+        }
     }
 
     pub fn configure_save_metadata(
@@ -197,12 +207,12 @@ impl Document {
 
         let caret = self.selection.active.byte_offset.min(bytes.len());
         let mut start = caret;
-        while start > 0 && bytes[start - 1] != b'\n' {
+        while start > 0 && !is_line_terminator(&bytes, start - 1) {
             start -= 1;
         }
 
         let mut end = caret;
-        while end < bytes.len() && bytes[end] != b'\n' {
+        while end < bytes.len() && !is_line_terminator(&bytes, end) {
             end += 1;
         }
         if include_line_ending && end < bytes.len() {
@@ -343,7 +353,8 @@ impl Document {
         if text.is_empty() {
             return Ok(());
         }
-        self.edit_replace_selection(text.as_bytes().to_vec(), EditGroupKind::Typing)
+        let normalized = self.normalize_for_insertion(text)?;
+        self.edit_replace_selection(normalized.into_bytes(), EditGroupKind::Typing)
     }
 
     pub fn replace_selection(&mut self, text: &str) -> Result<(), DocumentError> {
@@ -492,7 +503,8 @@ impl Document {
         if self.clipboard.is_empty() {
             return Ok(false);
         }
-        self.edit_replace_selection(self.clipboard.as_bytes().to_vec(), EditGroupKind::Typing)?;
+        let normalized = self.normalize_for_insertion(&self.clipboard)?;
+        self.edit_replace_selection(normalized.into_bytes(), EditGroupKind::Typing)?;
         Ok(true)
     }
 
@@ -509,7 +521,7 @@ impl Document {
         let sel_end = self.selection.end().min(before_bytes.len());
         let scan_end = if sel_end > sel_start
             && sel_end > 0
-            && before_bytes.get(sel_end - 1) == Some(&b'\n')
+            && is_line_terminator(&before_bytes, sel_end - 1)
         {
             sel_end - 1
         } else {
@@ -520,7 +532,7 @@ impl Document {
         let mut line_starts = vec![first_line_start];
         let mut cursor = first_line_start;
         while cursor < scan_end {
-            if before_bytes[cursor] == b'\n' && cursor + 1 <= before_bytes.len() {
+            if is_line_terminator(&before_bytes, cursor) && cursor + 1 <= before_bytes.len() {
                 line_starts.push(cursor + 1);
             }
             cursor += 1;
@@ -579,7 +591,7 @@ impl Document {
         let sel_end = self.selection.end().min(before_bytes.len());
         let scan_end = if sel_end > sel_start
             && sel_end > 0
-            && before_bytes.get(sel_end - 1) == Some(&b'\n')
+            && is_line_terminator(&before_bytes, sel_end - 1)
         {
             sel_end - 1
         } else {
@@ -590,7 +602,7 @@ impl Document {
         let mut line_starts = vec![first_line_start];
         let mut cursor = first_line_start;
         while cursor < scan_end {
-            if before_bytes[cursor] == b'\n' && cursor + 1 <= before_bytes.len() {
+            if is_line_terminator(&before_bytes, cursor) && cursor + 1 <= before_bytes.len() {
                 line_starts.push(cursor + 1);
             }
             cursor += 1;
@@ -722,6 +734,54 @@ impl Document {
             self.selection = Selection::caret(target);
         }
     }
+
+    /// Normalizes line endings in `text` before it is inserted (typing,
+    /// `Enter`, or paste). Cheaply passes through text with no newlines.
+    /// When newlines are present, the document's *current* dominant line
+    /// ending is detected and all newlines in `text` are rewritten to match
+    /// it, so pasting/typing doesn't turn a consistent file into a mixed one
+    /// (e.g. pasting `\n`-terminated text into a CRLF file becomes `\r\n`,
+    /// and terminal-supplied bare `\r` becomes whatever the document uses).
+    fn normalize_for_insertion(&self, text: &str) -> Result<String, DocumentError> {
+        if !text.contains('\n') && !text.contains('\r') {
+            return Ok(text.to_string());
+        }
+        let existing = self.tree.read_all()?;
+        let target = analyze_line_endings(&existing, LineEndingMode::Preserve)
+            .stats
+            .dominant()
+            .unwrap_or(LineEnding::Lf);
+        Ok(normalize_inserted_line_endings(text, target))
+    }
+}
+
+/// Rewrites every newline in `text` (`\n`, `\r\n`, or bare `\r`) to the given
+/// `target` line ending. Terminal bracketed-paste can deliver bare `\r` (seen
+/// e.g. under Windows Terminal + WSL) which, left as-is, would either corrupt
+/// line splitting or silently introduce a different convention than the rest
+/// of the document. Normalizing to the document's own dominant convention
+/// keeps a consistently-endinged file from becoming mixed by a paste/Enter.
+fn normalize_inserted_line_endings(text: &str, target: LineEnding) -> String {
+    let target_str: &str = match target {
+        LineEnding::Lf => "\n",
+        LineEnding::Crlf => "\r\n",
+        LineEnding::Cr => "\r",
+    };
+    let mut normalized = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\r' => {
+                if chars.peek() == Some(&'\n') {
+                    chars.next();
+                }
+                normalized.push_str(target_str);
+            }
+            '\n' => normalized.push_str(target_str),
+            _ => normalized.push(ch),
+        }
+    }
+    normalized
 }
 
 fn previous_word_start_offset(bytes: &[u8], caret: usize) -> usize {

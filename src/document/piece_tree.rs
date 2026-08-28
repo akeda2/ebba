@@ -4,6 +4,7 @@ use std::io::Write;
 use thiserror::Error;
 use unicode_segmentation::UnicodeSegmentation;
 
+use crate::document::format::is_line_terminator;
 use crate::document::source::{FileSourceRange, Source};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -275,7 +276,7 @@ impl PieceTree {
         let bytes = self.read_all()?;
         let mut cursor = offset;
         while cursor > 0 {
-            if bytes[cursor - 1] == b'\n' {
+            if is_line_terminator(&bytes, cursor - 1) {
                 break;
             }
             cursor -= 1;
@@ -287,7 +288,7 @@ impl PieceTree {
         let offset = offset.min(self.len);
         let bytes = self.read_all()?;
         let mut cursor = offset;
-        while cursor < bytes.len() && bytes[cursor] != b'\n' {
+        while cursor < bytes.len() && !is_line_terminator(&bytes, cursor) {
             cursor += 1;
         }
         Ok(cursor)
@@ -297,7 +298,7 @@ impl PieceTree {
         let offset = offset.min(self.len);
         let bytes = self.read_all()?;
         let mut line_start = offset;
-        while line_start > 0 && bytes[line_start - 1] != b'\n' {
+        while line_start > 0 && !is_line_terminator(&bytes, line_start - 1) {
             line_start -= 1;
         }
         let slice = &bytes[line_start..offset];
@@ -336,18 +337,18 @@ impl PieceTree {
                 }
                 let prev_end = line_start - 1;
                 let mut prev_start = prev_end;
-                while prev_start > 0 && bytes[prev_start - 1] != b'\n' {
+                while prev_start > 0 && !is_line_terminator(&bytes, prev_start - 1) {
                     prev_start -= 1;
                 }
                 (prev_start, prev_end)
             }
             VerticalDirection::Down => {
-                if line_end >= bytes.len() || bytes[line_end] != b'\n' {
+                if line_end >= bytes.len() || !is_line_terminator(&bytes, line_end) {
                     return Ok(bytes.len());
                 }
                 let next_start = line_end + 1;
                 let mut next_end = next_start;
-                while next_end < bytes.len() && bytes[next_end] != b'\n' {
+                while next_end < bytes.len() && !is_line_terminator(&bytes, next_end) {
                     next_end += 1;
                 }
                 (next_start, next_end)

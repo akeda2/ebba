@@ -137,6 +137,20 @@ impl LineEndingMetadata {
     }
 }
 
+/// Returns whether `bytes[index]` is the byte at which a line ends: `\n`,
+/// or a lone `\r` that is not immediately followed by `\n` (a `\r\n` pair is
+/// terminated by its `\n`, not its `\r`). Used throughout cursor movement,
+/// selection, and rendering so that `\n`, `\r\n`, and bare `\r` line endings
+/// are all navigable/renderable as line breaks, regardless of the mix of
+/// endings present in the document.
+pub fn is_line_terminator(bytes: &[u8], index: usize) -> bool {
+    match bytes.get(index) {
+        Some(b'\n') => true,
+        Some(b'\r') => bytes.get(index + 1) != Some(&b'\n'),
+        _ => false,
+    }
+}
+
 pub fn analyze_line_endings(bytes: &[u8], mode: LineEndingMode) -> LineEndingMetadata {
     let mut stats = LineEndingStats::default();
     let mut idx = 0;
