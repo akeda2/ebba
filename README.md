@@ -78,6 +78,15 @@ ebba README.md -w 80 -c -i
 
 `--text` and `--binary` are mutually exclusive.
 
+## Line endings
+
+- **Navigation & rendering**: `\n`, `\r\n`, and bare `\r` (old Mac-style) are all treated as line breaks for cursor movement, selection, indent/outdent, and rendering — including files with mixed endings. The underlying bytes are left untouched (see Preserve below), so this only affects how the buffer is navigated/displayed, not what's stored.
+- **Typing/paste normalization**: whenever text you type (`Enter`) or paste contains a newline, it is rewritten to match the file's own dominant line ending before insertion. Pasting `\n`-terminated text into a CRLF file produces `\r\n`; pasting terminal-supplied bare `\r` (a known quirk of some terminals, e.g. Windows Terminal under WSL) into an LF file produces `\n`. This keeps a consistently-ended file from becoming mixed by a paste.
+- **Status bar indicator**: shows `LF`, `CRLF`, `CR`, or `MIXED`, recomputed live from the current buffer content (not just a snapshot from when the file was opened), so it always reflects the real state of the document as you edit.
+- **Save modes** (`-l, --line-ending <lf|crlf>` or `default_line_ending` in config):
+  - Default is **Preserve**: bytes are saved exactly as they are in the buffer.
+  - `lf`/`crlf` **forces** the whole buffer onto that convention immediately on load (not only at save time), converting any `\r\n`/bare `\r` accordingly, so the in-editor buffer and status indicator match the forced mode right away; saving simply persists that already-normalized content.
+
 ## Config file location
 
 Default auto-load path is `~/.config/ebba/config.yaml` on all platforms.  
