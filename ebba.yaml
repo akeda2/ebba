@@ -5,11 +5,7 @@ jobs:
   active: true
   path: ~/dev/ebba
   run-mode: scheduled
-  pre-build: test -f target/release/ebba && mv -f target/release/ebba .
   build: ~/.cargo/bin/cargo clean
-  post-build:
-    - mkdir -p target/release/
-    - test -f ebba && cp -f ebba target/release/ || true
   at: "05:00"
 - name: ebba
   active: true
