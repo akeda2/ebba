@@ -155,11 +155,52 @@ fn movement_and_selection_boundaries_hold() {
 }
 
 #[test]
+fn bare_cr_line_endings_are_navigable_like_lf() {
+    // Old Mac-style CR-only line endings should behave the same as `\n` for
+    // cursor movement, not merge into one giant line. Use equal-width lines
+    // so vertical movement lands at a predictable column each time.
+    let mut doc = Document::from_bytes(b"abc\rdef\rghi".to_vec());
+
+    doc.move_document_start(false);
+    for _ in 0..9 {
+        doc.move_right(false).unwrap();
+    }
+    assert_eq!(doc.selection().active.byte_offset, 9); // column 1 of "ghi"
+
+    doc.move_up(false).unwrap();
+    assert_eq!(doc.selection().active.byte_offset, 5); // column 1 of "def"
+
+    doc.move_up(false).unwrap();
+    assert_eq!(doc.selection().active.byte_offset, 1); // column 1 of "abc"
+}
+
+#[test]
+fn mixed_line_endings_select_current_line_stops_at_any_terminator() {
+    let mut doc = Document::from_bytes(b"one\rtwo\r\nthree\nfour".to_vec());
+
+    doc.move_document_start(false);
+    for _ in 0.."one\r".len() {
+        doc.move_right(false).unwrap();
+    }
+    assert!(doc.select_current_line(false).unwrap());
+    assert_eq!(doc.selection().start(), "one\r".len());
+    assert_eq!(doc.selection().end(), "one\rtwo\r".len());
+}
+
+#[test]
 fn indent_selection_indents_each_selected_line() {
     let mut doc = Document::from_bytes(b"one\ntwo\nthree".to_vec());
     doc.select_all();
     assert!(doc.indent_selection_lines(2).unwrap());
     assert_eq!(doc.bytes().unwrap(), b"  one\n  two\n  three");
+}
+
+#[test]
+fn indent_selection_treats_mixed_line_endings_as_separate_lines() {
+    let mut doc = Document::from_bytes(b"one\rtwo\r\nthree".to_vec());
+    doc.select_all();
+    assert!(doc.indent_selection_lines(2).unwrap());
+    assert_eq!(doc.bytes().unwrap(), b"  one\r  two\r\n  three");
 }
 
 #[test]

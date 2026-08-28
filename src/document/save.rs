@@ -241,7 +241,12 @@ fn stream_write(
     }
 
     if pending_carriage_return {
-        encode_chunk(writer, b"\r", encoding, &mut wrote_bom)?;
+        let terminator: &[u8] = match line_ending_mode {
+            LineEndingMode::Lf => b"\n",
+            LineEndingMode::Crlf => b"\r\n",
+            LineEndingMode::Preserve => b"\r",
+        };
+        encode_chunk(writer, terminator, encoding, &mut wrote_bom)?;
     }
 
     Ok(())
@@ -256,6 +261,28 @@ fn stream_passthrough(tree: &PieceTree, writer: &mut File) -> Result<(), SaveErr
         offset += chunk_len;
     }
     Ok(())
+}
+
+/// Normalizes a complete in-memory buffer's line endings to `mode` in a
+/// single pass (as opposed to the chunked streaming variant used for
+/// writing files). Used to force a document's *loaded* content onto a
+/// single line-ending convention (e.g. via `--line-ending`/config), so the
+/// in-editor buffer and status indicator reflect the forced convention
+/// immediately rather than only at save time. No-op for `Preserve`.
+pub fn normalize_line_endings_buffer(input: &[u8], mode: LineEndingMode) -> Vec<u8> {
+    if mode == LineEndingMode::Preserve {
+        return input.to_vec();
+    }
+    let mut pending_carriage_return = false;
+    let mut output = normalize_line_endings(input, mode, &mut pending_carriage_return);
+    if pending_carriage_return {
+        match mode {
+            LineEndingMode::Lf => output.push(b'\n'),
+            LineEndingMode::Crlf => output.extend_from_slice(b"\r\n"),
+            LineEndingMode::Preserve => output.push(b'\r'),
+        }
+    }
+    output
 }
 
 fn normalize_line_endings(
@@ -279,7 +306,13 @@ fn normalize_line_endings(
             }
             idx = 1;
         } else {
-            output.push(b'\r');
+            // Lone `\r` from the previous chunk wasn't part of a CRLF pair;
+            // it's its own line terminator, so normalize it like any other.
+            match mode {
+                LineEndingMode::Lf => output.push(b'\n'),
+                LineEndingMode::Crlf => output.extend_from_slice(b"\r\n"),
+                LineEndingMode::Preserve => output.push(b'\r'),
+            }
         }
         *pending_carriage_return = false;
     }
@@ -300,7 +333,14 @@ fn normalize_line_endings(
                     idx += 2;
                     continue;
                 }
-                output.push(b'\r');
+                // Lone `\r` (old Mac-style line ending, not part of `\r\n`):
+                // still a line terminator, so normalize it to the target
+                // mode rather than leaving a stray, un-converted `\r`.
+                match mode {
+                    LineEndingMode::Lf => output.push(b'\n'),
+                    LineEndingMode::Crlf => output.extend_from_slice(b"\r\n"),
+                    LineEndingMode::Preserve => output.push(b'\r'),
+                }
                 idx += 1;
             }
             b'\n' if mode == LineEndingMode::Crlf => {

@@ -56,6 +56,7 @@ struct WrappedSegment {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LineEndingKind {
     Lf,
+    Cr,
     Crlf,
 }
 
@@ -286,15 +287,24 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
 fn line_ranges(bytes: &[u8]) -> Vec<LineRange> {
     let mut ranges = Vec::new();
     let mut start = 0usize;
+    let mut index = 0usize;
 
-    for (index, byte) in bytes.iter().enumerate() {
-        if *byte == b'\n' {
-            ranges.push(LineRange {
-                start,
-                end_no_newline: index,
-                end_with_newline: index + 1,
-            });
-            start = index + 1;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\r' if bytes.get(index + 1) == Some(&b'\n') => {
+                // Part of a CRLF pair; the `\n` branch below closes the line.
+                index += 1;
+            }
+            b'\n' | b'\r' => {
+                ranges.push(LineRange {
+                    start,
+                    end_no_newline: index,
+                    end_with_newline: index + 1,
+                });
+                index += 1;
+                start = index;
+            }
+            _ => index += 1,
         }
     }
 
@@ -310,6 +320,9 @@ fn line_ranges(bytes: &[u8]) -> Vec<LineRange> {
 fn line_ending_kind(range: LineRange, bytes: &[u8]) -> Option<LineEndingKind> {
     if range.end_with_newline == range.end_no_newline {
         return None;
+    }
+    if bytes.get(range.end_no_newline) == Some(&b'\r') {
+        return Some(LineEndingKind::Cr);
     }
     if range.end_no_newline > range.start && bytes[range.end_no_newline.saturating_sub(1)] == b'\r'
     {
@@ -344,7 +357,7 @@ fn decorate_line_text(
     }
     match ending {
         Some(LineEndingKind::Lf) => out.push('␊'),
-        Some(LineEndingKind::Crlf) => out.push('␍'),
+        Some(LineEndingKind::Cr) | Some(LineEndingKind::Crlf) => out.push('␍'),
         None => {}
     }
     out
@@ -596,6 +609,28 @@ mod tests {
         );
         assert!(rendered.lines[0].contains("a·b␍"));
         assert!(rendered.lines[1].contains("x␊"));
+    }
+
+    #[test]
+    fn bare_cr_and_mixed_endings_split_into_separate_rendered_lines() {
+        let doc = Document::from_bytes(b"one\rtwo\r\nthree\nfour".to_vec());
+        let rendered = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 20,
+                height: 4,
+                wrap: false,
+                wrap_column: None,
+                center_wrapped_text: false,
+                show_invisibles: false,
+            },
+        );
+        assert!(rendered.lines[0].contains("one"));
+        assert!(rendered.lines[1].contains("two"));
+        assert!(rendered.lines[2].contains("three"));
+        assert!(rendered.lines[3].contains("four"));
+        assert_eq!(rendered.total_lines, 4);
     }
 
     #[test]
