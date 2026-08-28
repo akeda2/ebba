@@ -66,6 +66,13 @@ keybindings:
 }
 
 #[test]
+fn parses_cr_line_ending() {
+    let path = write_config("default_line_ending: cr\n");
+    let loaded = EditorConfig::load(Some(path)).expect("config should parse");
+    assert_eq!(loaded.default_line_ending, LineEnding::Cr);
+}
+
+#[test]
 fn malformed_yaml_and_invalid_values_fail() {
     let malformed_path = write_config("indentation: [");
     match EditorConfig::load(Some(malformed_path)) {

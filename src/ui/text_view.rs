@@ -357,7 +357,11 @@ fn decorate_line_text(
     }
     match ending {
         Some(LineEndingKind::Lf) => out.push('␊'),
-        Some(LineEndingKind::Cr) | Some(LineEndingKind::Crlf) => out.push('␍'),
+        Some(LineEndingKind::Cr) => out.push('␍'),
+        Some(LineEndingKind::Crlf) => {
+            out.push('␍');
+            out.push('␊');
+        }
         None => {}
     }
     out
@@ -607,8 +611,29 @@ mod tests {
                 show_invisibles: true,
             },
         );
-        assert!(rendered.lines[0].contains("a·b␍"));
+        assert!(rendered.lines[0].contains("a·b␍␊"));
         assert!(rendered.lines[1].contains("x␊"));
+    }
+
+    #[test]
+    fn invisibles_show_distinct_marker_for_bare_cr() {
+        let doc = Document::from_bytes(b"one\rtwo\n".to_vec());
+        let rendered = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 20,
+                height: 2,
+                wrap: false,
+                wrap_column: None,
+                center_wrapped_text: false,
+                show_invisibles: true,
+            },
+        );
+        // Bare CR renders as a lone `␍`, distinct from CRLF's `␍␊` pair.
+        assert!(rendered.lines[0].contains("one␍"));
+        assert!(!rendered.lines[0].contains("one␍␊"));
+        assert!(rendered.lines[1].contains("two␊"));
     }
 
     #[test]

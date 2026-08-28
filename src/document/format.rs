@@ -10,6 +10,7 @@ pub enum LineEndingMode {
     #[default]
     Preserve,
     Lf,
+    Cr,
     Crlf,
 }
 
@@ -98,6 +99,13 @@ impl LineEndingMetadata {
                     crlf_count: 0,
                 };
             }
+            LineEndingMode::Cr => {
+                self.stats = LineEndingStats {
+                    lf_count: 0,
+                    cr_count: 1,
+                    crlf_count: 0,
+                };
+            }
             LineEndingMode::Crlf => {
                 self.stats = LineEndingStats {
                     lf_count: 0,
@@ -132,6 +140,7 @@ impl LineEndingMetadata {
         match self.mode {
             LineEndingMode::Preserve => self.detected(),
             LineEndingMode::Lf => Some(LineEnding::Lf),
+            LineEndingMode::Cr => Some(LineEnding::Cr),
             LineEndingMode::Crlf => Some(LineEnding::Crlf),
         }
     }

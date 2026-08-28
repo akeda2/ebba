@@ -9,6 +9,7 @@ use crate::input::KeybindingProfile;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum LineEnding {
     Lf,
+    Cr,
     Crlf,
 }
 
@@ -40,7 +41,7 @@ pub struct Cli {
         short = 'l',
         long,
         value_enum,
-        help = "Force line endings on save (defaults to preserving existing endings)"
+        help = "Force line endings on save: lf, cr, crlf (defaults to preserving existing endings)"
     )]
     pub line_ending: Option<LineEnding>,
     #[arg(
@@ -125,6 +126,7 @@ impl Cli {
         match self.line_ending {
             None => LineEndingMode::Preserve,
             Some(LineEnding::Lf) => LineEndingMode::Lf,
+            Some(LineEnding::Cr) => LineEndingMode::Cr,
             Some(LineEnding::Crlf) => LineEndingMode::Crlf,
         }
     }
@@ -307,5 +309,15 @@ mod tests {
             .expect("center should parse and imply wrapping at runtime");
         assert!(cli.center);
         assert_eq!(cli.wrap, None);
+    }
+
+    #[test]
+    fn parses_cr_line_ending() {
+        use crate::document::format::LineEndingMode;
+
+        let cli = Cli::try_parse_from(["ebba", "README.md", "-l", "cr"])
+            .expect("cr line ending should parse");
+        assert_eq!(cli.line_ending, Some(LineEnding::Cr));
+        assert_eq!(cli.line_ending_mode(), LineEndingMode::Cr);
     }
 }

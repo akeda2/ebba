@@ -98,6 +98,29 @@ fn save_applies_conversion_overrides() {
 }
 
 #[test]
+fn save_applies_cr_conversion_override() {
+    let output_path = fixture_path("save-convert-cr");
+    let mut document = Document::from_bytes(b"a\r\nb\nc\n".to_vec());
+    document.set_path(output_path.clone());
+    document.configure_save_metadata(
+        DetectedEncoding::Utf8,
+        analyze_line_endings(b"a\r\nb\nc\n", LineEndingMode::Preserve),
+    );
+
+    document
+        .save(SaveOverrides {
+            encoding: None,
+            line_ending_mode: Some(LineEndingMode::Cr),
+        })
+        .expect("save with cr override should succeed");
+
+    let written = fs::read(&output_path).expect("saved file should exist");
+    assert_eq!(written, b"a\rb\rc\r");
+
+    fs::remove_file(output_path).expect("fixture cleanup should succeed");
+}
+
+#[test]
 fn save_supports_utf16_without_bom_override() {
     let output_path = fixture_path("save-convert-utf16-nobom");
     let mut document = Document::from_bytes(b"a\nb\n".to_vec());
