@@ -4,6 +4,7 @@ use clap::{CommandFactory, FromArgMatches, Parser, ValueEnum};
 
 use crate::document::encoding::ContentOverride;
 use crate::document::format::LineEndingMode;
+use crate::help;
 use crate::input::KeybindingProfile;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -104,6 +105,12 @@ pub struct Cli {
     )]
     pub render_height: u16,
     #[arg(
+        long = "render-help",
+        requires = "render_once",
+        help = "Include startup help in --render-once output"
+    )]
+    pub render_help: bool,
+    #[arg(
         long = "hard-tabs",
         help = "Start in hard-tabs mode (Tab inserts literal tab bytes)"
     )]
@@ -174,21 +181,8 @@ impl Cli {
         keymap_mode_to_profile(self.keymap)
     }
 
-    fn key_bindings_help(profile: KeybindingProfile) -> &'static str {
-        match profile {
-            KeybindingProfile::MacOs => {
-                "Key bindings:\n  Save: ⌘S, Ctrl+S\n  Help: ⇧⌘?, Ctrl+H\n  Quit: ⌘Q, Ctrl+Q, F10\n  Force quit: Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: ⌘Z, ⇧⌘Z, Ctrl+Y\n  Clipboard: ⌘C, ⌘X, ⌘V, Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, ⌘A\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle hard tabs: Ctrl+Shift+T, Ctrl+Alt+T, Ctrl+Shift+H, F4\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, ⌥+←/→, ⌘+←/→, ⌘+↑/↓, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown, Shift+⌥+←/→, Shift+⌘+←/→, Shift+⌘+↑/↓\n  Toggle selection mode: F3, Ctrl+Space\n  Edit keys: Enter, Backspace, Delete, ⌥Backspace, ⌘Backspace, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh -w 80 -c -i\n  ebba data.bin -b"
-            }
-            KeybindingProfile::Linux => {
-                "Key bindings:\n  Save: Ctrl+S\n  Help: Ctrl+H, Alt+H\n  Quit: Ctrl+Q, Alt+Q, F10\n  Force quit: Ctrl+Alt+Q, Alt+Shift+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+A\n  Toggle BOM: Ctrl+B, Alt+B, Ctrl+Shift+B\n  Toggle tab width: Ctrl+T\n  Toggle hard tabs: Ctrl+Shift+T, Ctrl+Alt+T, Alt+Shift+T, Ctrl+Shift+H, F4\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K, Alt+I\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown\n  Toggle selection mode: F3, Ctrl+Space\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh -w 80 -c -i\n  ebba data.bin -b"
-            }
-            KeybindingProfile::LinuxConsole => {
-                "Key bindings:\n  Save: F2, Ctrl+S\n  Help: F1, Alt+H (Ctrl+H terminal-dependent)\n  Quit: F10, Ctrl+Q\n  Force quit: F12, Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+A (Ctrl+C/X copy/cut whole line on caret)\n  Toggle selection mode: F3, Ctrl+Space\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle hard tabs: Ctrl+Shift+T, Ctrl+Alt+T, Alt+Shift+T, Ctrl+Shift+H, F4\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown, or selection mode + move keys\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh -w 80 -c -i\n  ebba data.bin -b"
-            }
-            KeybindingProfile::Windows => {
-                "Key bindings:\n  Save: Ctrl+S\n  Help: F1, Ctrl+H\n  Quit: Ctrl+Q, F10\n  Force quit: Ctrl+Alt+Q, Ctrl+Shift+Q, Ctrl+G, F12\n  Undo/Redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z\n  Clipboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+C, Ctrl+Shift+V, Ctrl+A\n  Toggle BOM: Ctrl+B\n  Toggle tab width: Ctrl+T\n  Toggle hard tabs: Ctrl+Shift+T, Ctrl+Alt+T, Alt+Shift+T, Ctrl+Shift+H, F4\n  Toggle wrap: Ctrl+W\n  Toggle invisibles: Ctrl+K\n  Move cursor: Arrow keys, Home/End, Ctrl+←/→, Ctrl+Home/Ctrl+End, PageUp/PageDown\n  Select: Shift+Arrow keys, Shift+PageUp/PageDown\n  Toggle selection mode: F3, Ctrl+Space\n  Edit keys: Enter, Backspace, Delete, Ctrl+Backspace, Ctrl+U, Tab, Shift+Tab\n\nExamples:\n  ebba README.md\n  ebba script.sh -w 80 -c -i\n  ebba data.bin -b"
-            }
-        }
+    fn key_bindings_help(profile: KeybindingProfile) -> String {
+        help::cli_key_bindings_help(profile)
     }
 }
 
@@ -274,6 +268,7 @@ mod tests {
             render_once: false,
             render_width: 80,
             render_height: 24,
+            render_help: false,
             hard_tabs: false,
             config: None,
             keymap: KeymapMode::Auto,
@@ -385,6 +380,14 @@ mod tests {
         assert!(cli.render_once);
         assert_eq!(cli.render_width, 120);
         assert_eq!(cli.render_height, 40);
+    }
+
+    #[test]
+    fn parses_render_once_help_toggle() {
+        let cli = Cli::try_parse_from(["ebba", "README.md", "--render-once", "--render-help"])
+            .expect("render-help option should parse");
+        assert!(cli.render_once);
+        assert!(cli.render_help);
     }
 
     #[test]

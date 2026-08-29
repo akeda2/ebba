@@ -3,6 +3,7 @@ mod cli;
 mod command;
 mod config;
 mod document;
+mod help;
 mod input;
 mod terminal;
 mod ui;

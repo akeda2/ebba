@@ -6,6 +6,7 @@ use crate::{
     cli::Cli,
     command::{AppError, AppResult, Command, MoveCommand},
     config::{EditorConfig, LineEnding as ConfigLineEnding},
+    help::{self, HelpDetail, HelpMode},
     document::{
         Document,
         encoding::{DetectionOptions, StartupDecision, StartupPayload, detect_startup_mode},
@@ -764,7 +765,27 @@ pub fn run() -> AppResult<()> {
     }
     if args.render_once {
         let mut render_state = RenderState::new(args.render_width, args.render_height);
-        let frame = render_frame_for_state(&app_state, read_only, &mut render_state, None, None)?;
+        let header_message = if args.render_help {
+            Some(help::startup_help_text(
+                keybinding_profile,
+                if app_state.is_hex_mode() {
+                    HelpMode::Hex
+                } else {
+                    HelpMode::Text
+                },
+                HelpDetail::Compact,
+                args.render_width as usize,
+            ))
+        } else {
+            None
+        };
+        let frame = render_frame_for_state(
+            &app_state,
+            read_only,
+            &mut render_state,
+            header_message.as_deref(),
+            None,
+        )?;
         let output = format_render_once_output(&frame);
         stdout()
             .write_all(output.as_bytes())
@@ -780,10 +801,8 @@ pub fn run() -> AppResult<()> {
     };
     let mut render_state = RenderState::new(terminal.width, terminal.height);
     let mut flusher = WriterFlush::new(stdout());
-    let mut startup_help_message = Some(startup_help_text(
-        app_state.is_hex_mode(),
-        keybinding_profile,
-    ));
+    let mut show_startup_help = true;
+    let mut startup_help_detail = HelpDetail::Compact;
     let mut status_message: Option<String> = None;
     let mut needs_render = true;
 
@@ -794,6 +813,21 @@ pub fn run() -> AppResult<()> {
             render_state.height = terminal.height;
             needs_render = true;
         }
+
+        let startup_help_message = if show_startup_help {
+            Some(help::startup_help_text(
+                keybinding_profile,
+                if app_state.is_hex_mode() {
+                    HelpMode::Hex
+                } else {
+                    HelpMode::Text
+                },
+                startup_help_detail,
+                render_state.width as usize,
+            ))
+        } else {
+            None
+        };
 
         if needs_render {
             let frame = render_frame_for_state(
@@ -825,15 +859,19 @@ pub fn run() -> AppResult<()> {
         app_state.set_viewport_rows(render_state.body_height_for(chrome_rows).max(1));
         for command in commands {
             if matches!(&command, Command::ShowHelp) {
-                startup_help_message = Some(startup_help_text(
-                    app_state.is_hex_mode(),
-                    keybinding_profile,
-                ));
+                if show_startup_help && startup_help_detail == HelpDetail::Full {
+                    show_startup_help = false;
+                    startup_help_detail = HelpDetail::Compact;
+                } else {
+                    show_startup_help = true;
+                    startup_help_detail = HelpDetail::Full;
+                }
                 status_message = None;
                 needs_render = true;
                 continue;
             }
-            startup_help_message = None;
+            show_startup_help = false;
+            startup_help_detail = HelpDetail::Compact;
             if app_state.is_hex_mode() {
                 match command {
                     Command::InsertChar('q') => return Ok(()),
@@ -876,40 +914,6 @@ pub fn run() -> AppResult<()> {
                 }
             }
         }
-    }
-}
-
-fn startup_help_text(hex_mode: bool, profile: KeybindingProfile) -> String {
-    if hex_mode {
-        return match profile {
-            KeybindingProfile::MacOs => String::from(
-                "Quit: q/⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Help: ⇧⌘?/Ctrl+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
-            ),
-            KeybindingProfile::Linux => String::from(
-                "Quit: q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q •   Ctrl+Shift+Q/Ctrl+G/F12 • Help: Ctrl+H/Alt+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
-            ),
-            KeybindingProfile::LinuxConsole => String::from(
-                "Quit: q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G/Ctrl+Shift+Q/F12 • Help: F1 (Alt+H) • Scroll: ↑/↓/PgUp/PgDn/Home/End",
-            ),
-            KeybindingProfile::Windows => String::from(
-                "Quit: q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Help: F1/Ctrl+H • Scroll: ↑/↓/PgUp/PgDn/Home/End",
-            ),
-        };
-    }
-
-    match profile {
-        KeybindingProfile::MacOs => String::from(
-            "Save: ⌘S/Ctrl+S • Help: ⇧⌘?/Ctrl+H • Quit: ⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: ⌘C/X/V, Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: ⌘A, Shift+Arrows/Shift+PgUp/Shift+PgDn •   Shift+⌥←→/Shift+⌘←→/Shift+⌘↑↓ • Select-mode: F3/Ctrl+Space • Undo: ⌘Z/Ctrl+Z • Redo: ⇧⌘Z/Ctrl+Y • Toggle BOM: Ctrl+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T •   Ctrl+Shift+H/F4 • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/⌥←→/⌘←→ •   ⌘↑↓/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: ⌥Backspace/⌘Backspace •   Ctrl+Backspace/Ctrl+U",
-        ),
-        KeybindingProfile::Linux => String::from(
-            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q •   Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T/Alt+Shift+T •   Ctrl+Shift+H/F4 • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
-        ),
-        KeybindingProfile::LinuxConsole => String::from(
-            "Save: F2/Ctrl+S • Help: F1/Alt+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G/Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V (line fallback on caret) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U • Toggle: Ctrl+B BOM, Ctrl+T tab width, Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T/Alt+Shift+T •   Ctrl+Shift+H/F4, Ctrl+W wrap, Ctrl+K invisibles",
-        ),
-        KeybindingProfile::Windows => String::from(
-            "Save: Ctrl+S • Help: F1/Ctrl+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T/Alt+Shift+T •   Ctrl+Shift+H/F4 • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/Ctrl+←→ •   Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
-        ),
     }
 }
 
