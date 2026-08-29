@@ -10,6 +10,7 @@ pub struct StatusLine {
     pub line_ending: String,
     pub bom: String,
     pub tab_width: usize,
+    pub hard_tabs: bool,
     pub wrapped_segment: Option<(usize, usize)>,
     pub wrap_column: Option<usize>,
     pub show_invisibles: bool,
@@ -30,6 +31,7 @@ impl Default for StatusLine {
             line_ending: String::from("LF"),
             bom: String::from("NO-BOM"),
             tab_width: 2,
+            hard_tabs: false,
             wrapped_segment: None,
             wrap_column: None,
             show_invisibles: false,
@@ -67,13 +69,14 @@ impl StatusLine {
                 "Select-mode:OFF"
             }
         });
+        let tab_mode = if self.hard_tabs { "TABS:HARD" } else { "TABS:SOFT" };
         let line_label = if let Some((segment, total)) = self.wrapped_segment {
             format!("Ln {} ({}/{})", self.line, segment, total)
         } else {
             format!("Ln {}", self.line)
         };
         let left = format!(
-            "{} [{}|{}] {}, Col {} / {} TAB:{} {} {}{} {} {} {}",
+            "{} [{}|{}] {}, Col {} / {} TAB:{} {} {} {}{} {} {} {}",
             self.filename,
             modified,
             access,
@@ -81,6 +84,7 @@ impl StatusLine {
             self.column,
             self.total_lines,
             self.tab_width,
+            tab_mode,
             wrap,
             invisibles,
             selection_mode

@@ -318,6 +318,8 @@ fn map_ctrl_shortcut(
         's' => Some(Command::Save),
         'h' => Some(Command::ShowHelp),
         'b' => Some(Command::ToggleBom),
+        't' if alt => Some(Command::ToggleHardTabs),
+        't' if shift || ch.is_ascii_uppercase() => Some(Command::ToggleHardTabs),
         't' => Some(Command::CycleTabWidth),
         'w' => Some(Command::ToggleWrap),
         'k' => Some(Command::ToggleInvisibles),

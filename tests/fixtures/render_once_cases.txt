@@ -1,0 +1,14 @@
+# Render-once fixture: mixed characters and layout cases
+ASCII: abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789
+Punctuation: !@#$%^&*()_+-=[]{}|;:'",.<>/?`~
+Spaces: a b  c   d
+Tabs-soft-visual: tab	tab	aligned
+Leading-tab:	indented
+Trailing-tab:ends-with-tab	
+Unicode-Latin: åäö éèê ñ ç
+Unicode-wide: 你好 世界 日本語 한글
+Emoji: 😀 🚀 🧪 ✅
+Combining: é å ö
+Math: ∑ ∏ √ ∞ ≈ ≤ ≥
+Arrows-box: ← ↑ → ↓ │ ─ ┌ ┐ └ ┘
+Line ending sentinel

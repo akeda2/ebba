@@ -15,7 +15,10 @@ use crate::{
     input::{EventLoop, KeybindingProfile},
     terminal::{Terminal, TerminalModeGuard},
     ui::{
-        renderer::{RenderMode, RenderRequest, RenderState, Renderer, TerminalFlush, WriterFlush},
+        renderer::{
+            RenderFrame, RenderMode, RenderRequest, RenderState, Renderer, TerminalFlush,
+            WriterFlush,
+        },
         status::StatusLine,
     },
 };
@@ -39,6 +42,7 @@ pub struct AppState {
     read_only: bool,
     hex_mode: bool,
     tab_width: usize,
+    hard_tabs: bool,
     viewport_rows: usize,
     viewport_columns: usize,
     wrap_enabled: bool,
@@ -66,6 +70,7 @@ impl AppState {
             read_only: false,
             hex_mode: false,
             tab_width: 2,
+            hard_tabs: false,
             viewport_rows: 20,
             viewport_columns: 80,
             wrap_enabled: false,
@@ -91,6 +96,21 @@ impl AppState {
 
     pub fn tab_width(&self) -> usize {
         self.tab_width
+    }
+
+    pub fn set_tab_width(&mut self, tab_width: usize) {
+        self.tab_width = match tab_width {
+            2 | 4 | 8 => tab_width,
+            _ => 2,
+        };
+    }
+
+    pub fn hard_tabs(&self) -> bool {
+        self.hard_tabs
+    }
+
+    pub fn set_hard_tabs(&mut self, hard_tabs: bool) {
+        self.hard_tabs = hard_tabs;
     }
 
     pub fn is_hex_mode(&self) -> bool {
@@ -207,7 +227,11 @@ impl AppState {
                         .map_err(|error| AppError::Message(error.to_string()))?;
                 } else {
                     let inserted = if ch == '\t' {
-                        " ".repeat(self.tab_width)
+                        if self.hard_tabs {
+                            "\t".to_string()
+                        } else {
+                            " ".repeat(self.tab_width)
+                        }
                     } else {
                         ch.to_string()
                     };
@@ -223,6 +247,10 @@ impl AppState {
                     4 => 8,
                     _ => 2,
                 };
+                Ok(CommandDisposition::Continue)
+            }
+            Command::ToggleHardTabs => {
+                self.hard_tabs = !self.hard_tabs;
                 Ok(CommandDisposition::Continue)
             }
             Command::ShowHelp => Ok(CommandDisposition::Continue),
@@ -538,6 +566,83 @@ fn normalize_loaded_text_bytes(bytes: Vec<u8>, forced_mode: Option<LineEndingMod
     }
 }
 
+fn render_frame_for_state(
+    app_state: &AppState,
+    read_only: bool,
+    state: &mut RenderState,
+    header_message: Option<&str>,
+    status_message: Option<String>,
+) -> AppResult<RenderFrame> {
+    let filename = app_state
+        .document()
+        .path()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| String::from("[No Name]"));
+    let status = StatusLine {
+        filename,
+        dirty: app_state.is_dirty(),
+        read_only,
+        encoding: app_state.status_encoding_label().to_string(),
+        line_ending: app_state
+            .document()
+            .line_endings()
+            .indicator()
+            .label()
+            .to_string(),
+        bom: app_state.status_bom_label().to_string(),
+        tab_width: app_state.tab_width(),
+        hard_tabs: app_state.hard_tabs(),
+        wrap_column: app_state.status_wrap_column(),
+        show_invisibles: app_state.show_invisibles(),
+        selection_mode: Some(app_state.selection_mode_enabled()),
+        message: status_message,
+        ..StatusLine::default()
+    };
+
+    let renderer = Renderer;
+    if app_state.is_hex_mode() {
+        let bytes = app_state
+            .document()
+            .bytes()
+            .map_err(|error| AppError::Message(error.to_string()))?;
+        Ok(renderer.render(
+            state,
+            RenderRequest {
+                mode: RenderMode::Hex { bytes: &bytes },
+                status,
+                header_message,
+            },
+        ))
+    } else {
+        Ok(renderer.render(
+            state,
+            RenderRequest {
+                mode: RenderMode::Text {
+                    document: app_state.document(),
+                    wrap: app_state.is_wrap_enabled(),
+                    wrap_column: app_state.effective_wrap_column(),
+                    center_wrapped_text: app_state.wrap_centered(),
+                    show_invisibles: app_state.show_invisibles(),
+                    tab_width: app_state.tab_width(),
+                },
+                status,
+                header_message,
+            },
+        ))
+    }
+}
+
+fn format_render_once_output(frame: &RenderFrame) -> String {
+    let mut out = frame.to_string_frame();
+    out.push('\n');
+    if let Some((row, col)) = frame.cursor {
+        out.push_str(&format!("# cursor: {},{}\n", row + 1, col + 1));
+    } else {
+        out.push_str("# cursor: hidden\n");
+    }
+    out
+}
+
 pub fn run() -> AppResult<()> {
     let args = Cli::parse_args();
     let keybinding_profile = args.keybinding_profile();
@@ -638,6 +743,10 @@ pub fn run() -> AppResult<()> {
     app_state.set_read_only(read_only);
     app_state.set_keybinding_profile(keybinding_profile);
     app_state.set_show_invisibles(args.invisibles);
+    if let Some(tab_width) = args.tab_width {
+        app_state.set_tab_width(tab_width);
+    }
+    app_state.set_hard_tabs(args.hard_tabs);
     app_state.set_wrap_centered(args.center);
     match args.wrap {
         None => {
@@ -653,6 +762,15 @@ pub fn run() -> AppResult<()> {
             app_state.set_wrap_column(Some(column));
         }
     }
+    if args.render_once {
+        let mut render_state = RenderState::new(args.render_width, args.render_height);
+        let frame = render_frame_for_state(&app_state, read_only, &mut render_state, None, None)?;
+        let output = format_render_once_output(&frame);
+        stdout()
+            .write_all(output.as_bytes())
+            .map_err(|error| AppError::Message(error.to_string()))?;
+        return Ok(());
+    }
 
     let mut terminal = Terminal::new()?;
     let _terminal_modes = TerminalModeGuard::enter()?;
@@ -660,7 +778,6 @@ pub fn run() -> AppResult<()> {
         profile: keybinding_profile,
         ..EventLoop::default()
     };
-    let renderer = Renderer;
     let mut render_state = RenderState::new(terminal.width, terminal.height);
     let mut flusher = WriterFlush::new(stdout());
     let mut startup_help_message = Some(startup_help_text(
@@ -679,60 +796,13 @@ pub fn run() -> AppResult<()> {
         }
 
         if needs_render {
-            let filename = app_state
-                .document()
-                .path()
-                .map(|p| p.display().to_string())
-                .unwrap_or_else(|| String::from("[No Name]"));
-            let status = StatusLine {
-                filename,
-                dirty: app_state.is_dirty(),
+            let frame = render_frame_for_state(
+                &app_state,
                 read_only,
-                encoding: app_state.status_encoding_label().to_string(),
-                line_ending: app_state
-                    .document()
-                    .line_endings()
-                    .indicator()
-                    .label()
-                    .to_string(),
-                bom: app_state.status_bom_label().to_string(),
-                tab_width: app_state.tab_width(),
-                wrap_column: app_state.status_wrap_column(),
-                show_invisibles: app_state.show_invisibles(),
-                selection_mode: Some(app_state.selection_mode_enabled()),
-                message: status_message.clone(),
-                ..StatusLine::default()
-            };
-
-            let frame = if app_state.hex_mode {
-                let bytes = app_state
-                    .document()
-                    .bytes()
-                    .map_err(|error| AppError::Message(error.to_string()))?;
-                renderer.render(
-                    &mut render_state,
-                    RenderRequest {
-                        mode: RenderMode::Hex { bytes: &bytes },
-                        status,
-                        header_message: startup_help_message.as_deref(),
-                    },
-                )
-            } else {
-                renderer.render(
-                    &mut render_state,
-                    RenderRequest {
-                        mode: RenderMode::Text {
-                            document: app_state.document(),
-                            wrap: app_state.is_wrap_enabled(),
-                            wrap_column: app_state.effective_wrap_column(),
-                            center_wrapped_text: app_state.wrap_centered(),
-                            show_invisibles: app_state.show_invisibles(),
-                        },
-                        status,
-                        header_message: startup_help_message.as_deref(),
-                    },
-                )
-            };
+                &mut render_state,
+                startup_help_message.as_deref(),
+                status_message.clone(),
+            )?;
             flusher
                 .flush(&frame)
                 .map_err(|error| AppError::Message(error.to_string()))?;
@@ -829,16 +899,16 @@ fn startup_help_text(hex_mode: bool, profile: KeybindingProfile) -> String {
 
     match profile {
         KeybindingProfile::MacOs => String::from(
-            "Save: ⌘S/Ctrl+S • Help: ⇧⌘?/Ctrl+H • Quit: ⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: ⌘C/X/V, Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: ⌘A, Shift+Arrows/Shift+PgUp/Shift+PgDn •   Shift+⌥←→/Shift+⌘←→/Shift+⌘↑↓ • Select-mode: F3/Ctrl+Space • Undo: ⌘Z/Ctrl+Z • Redo: ⇧⌘Z/Ctrl+Y • Toggle BOM: Ctrl+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/⌥←→/⌘←→ •   ⌘↑↓/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: ⌥Backspace/⌘Backspace •   Ctrl+Backspace/Ctrl+U",
+            "Save: ⌘S/Ctrl+S • Help: ⇧⌘?/Ctrl+H • Quit: ⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: ⌘C/X/V, Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: ⌘A, Shift+Arrows/Shift+PgUp/Shift+PgDn •   Shift+⌥←→/Shift+⌘←→/Shift+⌘↑↓ • Select-mode: F3/Ctrl+Space • Undo: ⌘Z/Ctrl+Z • Redo: ⇧⌘Z/Ctrl+Y • Toggle BOM: Ctrl+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/⌥←→/⌘←→ •   ⌘↑↓/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: ⌥Backspace/⌘Backspace •   Ctrl+Backspace/Ctrl+U",
         ),
         KeybindingProfile::Linux => String::from(
-            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q •   Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
+            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q •   Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
         ),
         KeybindingProfile::LinuxConsole => String::from(
-            "Save: F2/Ctrl+S • Help: F1/Alt+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G/Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V (line fallback on caret) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U • Toggle: Ctrl+B BOM, Ctrl+T tab, Ctrl+W wrap, Ctrl+K invisibles",
+            "Save: F2/Ctrl+S • Help: F1/Alt+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G/Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V (line fallback on caret) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U • Toggle: Ctrl+B BOM, Ctrl+T tab width, Ctrl+Shift+T/Ctrl+Alt+T hard tabs, Ctrl+W wrap, Ctrl+K invisibles",
         ),
         KeybindingProfile::Windows => String::from(
-            "Save: Ctrl+S • Help: F1/Ctrl+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B • Toggle tab: Ctrl+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/Ctrl+←→ •   Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
+            "Save: Ctrl+S • Help: F1/Ctrl+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/Ctrl+←→ •   Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
         ),
     }
 }
@@ -1095,7 +1165,7 @@ mod tests {
 
     use crate::ui::renderer::RenderState;
 
-    use super::{AppState, CommandDisposition, apply_hex_scroll};
+    use super::{AppState, CommandDisposition, apply_hex_scroll, format_render_once_output, render_frame_for_state};
 
     fn fixture_path(name: &str) -> PathBuf {
         let path = PathBuf::from("target/test-fixtures");
@@ -1170,6 +1240,44 @@ mod tests {
             app.document().bytes().expect("bytes should be readable"),
             b"    "
         );
+    }
+
+    #[test]
+    fn hard_tabs_mode_inserts_literal_tab() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        assert!(!app.hard_tabs());
+        app.execute_command(Command::ToggleHardTabs)
+            .expect("toggle should succeed");
+        assert!(app.hard_tabs());
+        app.execute_command(Command::InsertChar('\t'))
+            .expect("tab insert should succeed");
+        assert_eq!(
+            app.document().bytes().expect("bytes should be readable"),
+            b"\t"
+        );
+    }
+
+    #[test]
+    fn render_once_frame_shows_tab_markers_in_invisibles_mode() {
+        let mut app = AppState::new(Document::from_bytes(b"\t".to_vec()));
+        app.set_show_invisibles(true);
+        app.execute_command(Command::CycleTabWidth)
+            .expect("tab width cycle should succeed"); // 2 -> 4
+        let mut render_state = RenderState::new(20, 4);
+        let frame = render_frame_for_state(&app, false, &mut render_state, None, None)
+            .expect("render should succeed");
+        assert!(frame.lines[1].contains("→···"));
+    }
+
+    #[test]
+    fn render_once_output_includes_cursor_metadata_line() {
+        let frame = crate::ui::renderer::RenderFrame {
+            lines: vec!["status".to_string(), "body".to_string()],
+            cursor: Some((1, 4)),
+        };
+        let output = format_render_once_output(&frame);
+        assert!(output.contains("# cursor: 2,5"));
     }
 
     #[test]

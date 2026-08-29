@@ -30,6 +30,7 @@ pub enum Command {
     DeleteWordBackward,
     DeleteToLineStart,
     CycleTabWidth,
+    ToggleHardTabs,
     ShowHelp,
     ToggleBom,
     ToggleWrap,

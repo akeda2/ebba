@@ -7,7 +7,7 @@ use ebba::ui::text_view::{TextView, TextViewport};
 #[test]
 fn status_line_is_rendered_on_top_row() {
     let doc = Document::from_bytes(b"alpha\nbeta".to_vec());
-    let mut state = RenderState::new(80, 4);
+    let mut state = RenderState::new(120, 4);
     let status = StatusLine {
         filename: "notes.txt".to_string(),
         message: Some("saved".to_string()),
@@ -22,6 +22,7 @@ fn status_line_is_rendered_on_top_row() {
                 wrap_column: None,
                 center_wrapped_text: false,
                 show_invisibles: false,
+                tab_width: 2,
             },
             status,
             header_message: None,
@@ -46,6 +47,7 @@ fn text_mode_always_includes_line_number_gutter() {
             wrap_column: None,
             center_wrapped_text: false,
             show_invisibles: false,
+            tab_width: 2,
         },
     );
     assert!(rendered.lines[0].starts_with("   1 "));
@@ -64,6 +66,7 @@ fn viewport_clips_rows_based_on_scroll() {
             wrap_column: None,
             center_wrapped_text: false,
             show_invisibles: false,
+            tab_width: 2,
         },
     );
 
@@ -123,6 +126,7 @@ fn renderer_keeps_status_line_when_body_height_is_zero() {
                 wrap_column: None,
                 center_wrapped_text: false,
                 show_invisibles: false,
+                tab_width: 2,
             },
             status: StatusLine {
                 filename: "tiny.txt".to_string(),
@@ -150,6 +154,7 @@ fn gutter_width_scales_with_total_line_count() {
             wrap_column: None,
             center_wrapped_text: false,
             show_invisibles: false,
+            tab_width: 2,
         },
     );
 
@@ -177,6 +182,7 @@ fn text_view_renders_utf8_file_content() {
             wrap_column: None,
             center_wrapped_text: false,
             show_invisibles: false,
+            tab_width: 2,
         },
     );
 
@@ -197,6 +203,7 @@ fn renderer_places_cursor_on_first_text_row_not_status_row() {
                 wrap_column: None,
                 center_wrapped_text: false,
                 show_invisibles: false,
+                tab_width: 2,
             },
             status: StatusLine::default(),
             header_message: None,
@@ -219,6 +226,7 @@ fn renderer_places_transient_header_above_status() {
                 wrap_column: None,
                 center_wrapped_text: false,
                 show_invisibles: false,
+                tab_width: 2,
             },
             status: StatusLine {
                 filename: "notes.txt".to_string(),
@@ -247,6 +255,7 @@ fn renderer_wraps_transient_header_by_width() {
                 wrap_column: None,
                 center_wrapped_text: false,
                 show_invisibles: false,
+                tab_width: 2,
             },
             status: StatusLine::default(),
             header_message: Some("1234567890AB"),
@@ -304,6 +313,7 @@ fn wrapped_status_shows_logical_line_and_wrap_segment() {
                 wrap_column: Some(4),
                 center_wrapped_text: false,
                 show_invisibles: false,
+                tab_width: 2,
             },
             status: StatusLine::default(),
             header_message: None,
@@ -330,6 +340,7 @@ fn centered_wrap_shifts_text_but_not_status_or_header_width() {
                 wrap_column: Some(4),
                 center_wrapped_text: true,
                 show_invisibles: false,
+                tab_width: 2,
             },
             status: StatusLine {
                 wrap_column: Some(4),
@@ -360,6 +371,7 @@ fn selection_is_visually_highlighted() {
             wrap_column: None,
             center_wrapped_text: false,
             show_invisibles: false,
+            tab_width: 2,
         },
     );
 
@@ -382,6 +394,7 @@ fn selecting_line_break_shows_inverted_block() {
             wrap_column: None,
             center_wrapped_text: false,
             show_invisibles: false,
+            tab_width: 2,
         },
     );
 

@@ -74,6 +74,24 @@ fn maps_core_ctrl_shortcuts() {
 }
 
 #[test]
+fn maps_ctrl_shift_t_to_toggle_hard_tabs() {
+    let key = KeyEvent::new(
+        KeyCode::Char('t'),
+        KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+    );
+    assert_eq!(map_default(key), Some(Command::ToggleHardTabs));
+}
+
+#[test]
+fn maps_ctrl_alt_t_to_toggle_hard_tabs() {
+    let key = KeyEvent::new(
+        KeyCode::Char('t'),
+        KeyModifiers::CONTROL | KeyModifiers::ALT,
+    );
+    assert_eq!(map_default(key), Some(Command::ToggleHardTabs));
+}
+
+#[test]
 fn maps_ctrl_q_control_character_form_to_quit() {
     let key = KeyEvent::new(KeyCode::Char('\u{11}'), KeyModifiers::NONE);
     assert_eq!(map_default(key), Some(Command::Quit));
