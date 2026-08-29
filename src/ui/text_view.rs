@@ -1,4 +1,4 @@
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthChar;
 
 use crate::document::Document;
 
@@ -341,26 +341,25 @@ fn decorate_line_text(
     show_invisibles: bool,
     ending: Option<LineEndingKind>,
 ) -> String {
-    if !show_invisibles {
-        return content.to_string();
-    }
-
     let mut out = String::with_capacity(content.len() + 2);
     for ch in content.chars() {
-        if ch == ' ' {
-            out.push('·');
-        } else {
-            out.push(ch);
+        match ch {
+            ' ' if show_invisibles => out.push('·'),
+            '\t' if show_invisibles => out.push('→'),
+            '\t' => out.push(' '),
+            _ => out.push(ch),
         }
     }
-    match ending {
-        Some(LineEndingKind::Lf) => out.push('␊'),
-        Some(LineEndingKind::Cr) => out.push('␍'),
-        Some(LineEndingKind::Crlf) => {
-            out.push('␍');
-            out.push('␊');
+    if show_invisibles {
+        match ending {
+            Some(LineEndingKind::Lf) => out.push('␊'),
+            Some(LineEndingKind::Cr) => out.push('␍'),
+            Some(LineEndingKind::Crlf) => {
+                out.push('␍');
+                out.push('␊');
+            }
+            None => {}
         }
-        None => {}
     }
     out
 }
@@ -375,9 +374,9 @@ fn offset_to_line_column(ranges: &[LineRange], bytes: &[u8], offset: usize) -> (
         };
         if in_line {
             let line_offset = offset.min(range.end_no_newline).saturating_sub(range.start);
-            let width = UnicodeWidthStr::width(
-                String::from_utf8_lossy(&bytes[range.start..range.start + line_offset]).as_ref(),
-            );
+            let width = display_width(String::from_utf8_lossy(
+                &bytes[range.start..range.start + line_offset],
+            ));
             return (index, width);
         }
     }
@@ -395,10 +394,8 @@ fn selection_span_for_line(
     let start = selection_start.max(range.start).min(range.end_no_newline);
     let end = selection_end.max(range.start).min(range.end_no_newline);
 
-    let start_width =
-        UnicodeWidthStr::width(String::from_utf8_lossy(&bytes[range.start..start]).as_ref());
-    let end_width =
-        UnicodeWidthStr::width(String::from_utf8_lossy(&bytes[range.start..end]).as_ref());
+    let start_width = display_width(String::from_utf8_lossy(&bytes[range.start..start]));
+    let end_width = display_width(String::from_utf8_lossy(&bytes[range.start..end]));
     let highlight_line_break = selection_start < range.end_with_newline
         && selection_end > range.end_no_newline
         && range.end_with_newline > range.end_no_newline;
@@ -424,7 +421,7 @@ fn clip_to_width(input: &str, max_width: usize) -> String {
     let mut used = 0usize;
     let mut out = String::new();
     for ch in input.chars() {
-        let width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        let width = display_width_char(ch);
         if used + width > max_width {
             break;
         }
@@ -436,7 +433,7 @@ fn clip_to_width(input: &str, max_width: usize) -> String {
 
 fn fit_to_width(input: &str, width: usize) -> String {
     let clipped = clip_to_width(input, width);
-    let used = UnicodeWidthStr::width(clipped.as_str());
+    let used = display_width(clipped.as_str());
     if used >= width {
         return clipped;
     }
@@ -444,6 +441,18 @@ fn fit_to_width(input: &str, width: usize) -> String {
     let mut padded = clipped;
     padded.push_str(&" ".repeat(width - used));
     padded
+}
+
+fn display_width_char(ch: char) -> usize {
+    if ch == '\t' {
+        // Keep tabs stable for cursor math and clipping/rendering.
+        return 1;
+    }
+    UnicodeWidthChar::width(ch).unwrap_or(0)
+}
+
+fn display_width(input: impl AsRef<str>) -> usize {
+    input.as_ref().chars().map(display_width_char).sum()
 }
 
 fn render_text_with_selection(
@@ -460,7 +469,7 @@ fn render_text_with_selection(
     let mut inverse_on = false;
 
     for ch in content.chars() {
-        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        let ch_width = display_width_char(ch);
         if ch_width > 0 && used + ch_width > width {
             break;
         }
@@ -513,7 +522,7 @@ fn wrap_segments(content: &str, width: usize) -> Vec<WrappedSegment> {
     let mut total_width = 0usize;
 
     for ch in content.chars() {
-        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+        let ch_width = display_width_char(ch);
         if segment_width > 0 && segment_width + ch_width > width {
             segments.push(WrappedSegment {
                 text: segment,
@@ -611,6 +620,34 @@ mod tests {
         );
         assert!(rendered.lines[0].contains("a·b␍␊"));
         assert!(rendered.lines[1].contains("x␊"));
+    }
+
+    #[test]
+    fn invisibles_show_tab_markers() {
+        let doc = Document::from_bytes(b"a\tb\n".to_vec());
+        let rendered = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 20,
+                height: 1,
+                wrap: false,
+                wrap_column: None,
+                center_wrapped_text: false,
+                show_invisibles: true,
+            },
+        );
+        assert!(rendered.lines[0].contains("a→b␊"));
+    }
+
+    #[test]
+    fn tabs_count_as_single_visual_column_for_cursor_math() {
+        let bytes = b"a\tb";
+        let ranges = line_ranges(bytes);
+        assert_eq!(offset_to_line_column(&ranges, bytes, 0), (0, 0));
+        assert_eq!(offset_to_line_column(&ranges, bytes, 1), (0, 1));
+        assert_eq!(offset_to_line_column(&ranges, bytes, 2), (0, 2));
+        assert_eq!(offset_to_line_column(&ranges, bytes, 3), (0, 3));
     }
 
     #[test]
