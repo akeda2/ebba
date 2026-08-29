@@ -201,10 +201,8 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
             let selection = line_selection.and_then(|sel| {
                 let start = sel.start_column.max(segment.start_column);
                 let end = sel.end_column.min(segment.end_column);
-                if start >= end {
-                    if !(sel.highlight_line_break && segment_index == last_segment) {
-                        return None;
-                    }
+                if start >= end && !(sel.highlight_line_break && segment_index == last_segment) {
+                    return None;
                 }
                 Some(SelectionSpan {
                     start_column: start - segment.start_column,

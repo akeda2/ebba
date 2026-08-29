@@ -286,12 +286,12 @@ fn decode_utf16_body_with_bom(bytes: &[u8], little_endian: bool) -> Option<Strin
 }
 
 fn decode_utf16_bytes(bytes: &[u8], little_endian: bool) -> Option<String> {
-    if bytes.is_empty() || bytes.len() % 2 != 0 {
+    if bytes.is_empty() || !bytes.len().is_multiple_of(2) {
         return None;
     }
 
     let mut code_units = Vec::with_capacity(bytes.len() / 2);
-    for chunk in bytes.chunks_exact(2) {
+    for chunk in bytes.as_chunks::<2>().0 {
         let unit = if little_endian {
             u16::from_le_bytes([chunk[0], chunk[1]])
         } else {
@@ -312,7 +312,7 @@ fn utf16_without_bom_plan(bytes: &[u8]) -> Option<(DetectedEncoding, String)> {
 }
 
 fn detect_utf16_without_bom(bytes: &[u8]) -> Option<DetectedEncoding> {
-    if bytes.len() < 8 || bytes.len() % 2 != 0 {
+    if bytes.len() < 8 || !bytes.len().is_multiple_of(2) {
         return None;
     }
 

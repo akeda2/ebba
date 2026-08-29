@@ -500,7 +500,7 @@ impl AppState {
 }
 
 fn hex_total_rows(byte_len: usize) -> usize {
-    ((byte_len + 15) / 16).max(1)
+    byte_len.div_ceil(16).max(1)
 }
 
 fn apply_hex_scroll(state: &mut RenderState, direction: MoveCommand, total_rows: usize) -> bool {
@@ -590,12 +590,9 @@ pub fn run() -> AppResult<()> {
     match startup {
         StartupDecision::Ready(plan) => {
             document = match plan.payload {
-                StartupPayload::DecodedText { text, .. } => {
-                    Document::from_bytes(normalize_loaded_text_bytes(
-                        text.into_bytes(),
-                        forced_line_ending_mode,
-                    ))
-                }
+                StartupPayload::DecodedText { text, .. } => Document::from_bytes(
+                    normalize_loaded_text_bytes(text.into_bytes(), forced_line_ending_mode),
+                ),
                 StartupPayload::BytePreservingText { bytes } => Document::from_bytes(
                     normalize_loaded_text_bytes(bytes, forced_line_ending_mode),
                 ),
@@ -610,12 +607,9 @@ pub fn run() -> AppResult<()> {
         }
         StartupDecision::RequiresConfirmation(pending) => {
             document = match pending.proposed.payload {
-                StartupPayload::DecodedText { text, .. } => {
-                    Document::from_bytes(normalize_loaded_text_bytes(
-                        text.into_bytes(),
-                        forced_line_ending_mode,
-                    ))
-                }
+                StartupPayload::DecodedText { text, .. } => Document::from_bytes(
+                    normalize_loaded_text_bytes(text.into_bytes(), forced_line_ending_mode),
+                ),
                 StartupPayload::BytePreservingText { bytes } => Document::from_bytes(
                     normalize_loaded_text_bytes(bytes, forced_line_ending_mode),
                 ),
@@ -1259,7 +1253,10 @@ mod tests {
         let mut document = Document::from_bytes(b"a\nb\n".to_vec());
         document.configure_save_metadata(
             document.detected_encoding(),
-            analyze_line_endings(b"a\r\nb\r\r\n".to_vec().as_slice(), LineEndingMode::Preserve),
+            analyze_line_endings(
+                b"a\r\nb\r\r\n".to_vec().as_slice(),
+                LineEndingMode::Preserve,
+            ),
         );
         assert_eq!(document.line_endings().indicator(), LineEndingIndicator::Lf);
 
@@ -1294,7 +1291,10 @@ mod tests {
             b"a\r\nb\r\nc\r\nd".to_vec()
         );
         // No forced mode (Preserve/default) leaves bytes untouched.
-        assert_eq!(super::normalize_loaded_text_bytes(mixed.clone(), None), mixed);
+        assert_eq!(
+            super::normalize_loaded_text_bytes(mixed.clone(), None),
+            mixed
+        );
     }
 
     #[test]
@@ -1408,7 +1408,8 @@ mod tests {
         let mut app = AppState::new(document);
         app.set_keybinding_profile(crate::input::KeybindingProfile::LinuxConsole);
 
-        app.execute_command(Command::Cut).expect("cut should succeed");
+        app.execute_command(Command::Cut)
+            .expect("cut should succeed");
 
         assert_eq!(app.document().clipboard(), "cd\n");
         assert_eq!(

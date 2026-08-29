@@ -198,7 +198,10 @@ impl Document {
         self.preferred_column = None;
     }
 
-    pub fn select_current_line(&mut self, include_line_ending: bool) -> Result<bool, DocumentError> {
+    pub fn select_current_line(
+        &mut self,
+        include_line_ending: bool,
+    ) -> Result<bool, DocumentError> {
         self.history.flush_pending();
         let bytes = self.tree.read_all()?;
         if bytes.is_empty() {
@@ -519,20 +522,19 @@ impl Document {
 
         let sel_start = self.selection.start().min(before_bytes.len());
         let sel_end = self.selection.end().min(before_bytes.len());
-        let scan_end = if sel_end > sel_start
-            && sel_end > 0
-            && is_line_terminator(&before_bytes, sel_end - 1)
-        {
-            sel_end - 1
-        } else {
-            sel_end
-        };
+        let scan_end =
+            if sel_end > sel_start && sel_end > 0 && is_line_terminator(&before_bytes, sel_end - 1)
+            {
+                sel_end - 1
+            } else {
+                sel_end
+            };
         let first_line_start = self.tree.line_start_offset(sel_start)?;
 
         let mut line_starts = vec![first_line_start];
         let mut cursor = first_line_start;
         while cursor < scan_end {
-            if is_line_terminator(&before_bytes, cursor) && cursor + 1 <= before_bytes.len() {
+            if is_line_terminator(&before_bytes, cursor) && cursor < before_bytes.len() {
                 line_starts.push(cursor + 1);
             }
             cursor += 1;
@@ -589,20 +591,19 @@ impl Document {
         let before_selection = self.selection;
         let sel_start = self.selection.start().min(before_bytes.len());
         let sel_end = self.selection.end().min(before_bytes.len());
-        let scan_end = if sel_end > sel_start
-            && sel_end > 0
-            && is_line_terminator(&before_bytes, sel_end - 1)
-        {
-            sel_end - 1
-        } else {
-            sel_end
-        };
+        let scan_end =
+            if sel_end > sel_start && sel_end > 0 && is_line_terminator(&before_bytes, sel_end - 1)
+            {
+                sel_end - 1
+            } else {
+                sel_end
+            };
         let first_line_start = self.tree.line_start_offset(sel_start)?;
 
         let mut line_starts = vec![first_line_start];
         let mut cursor = first_line_start;
         while cursor < scan_end {
-            if is_line_terminator(&before_bytes, cursor) && cursor + 1 <= before_bytes.len() {
+            if is_line_terminator(&before_bytes, cursor) && cursor < before_bytes.len() {
                 line_starts.push(cursor + 1);
             }
             cursor += 1;
