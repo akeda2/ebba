@@ -168,6 +168,18 @@ pub fn command_from_key_event_with_profile(
         KeyCode::Char('i') | KeyCode::Char('I') if alt && profile == KeybindingProfile::Linux => {
             Some(Command::ToggleInvisibles)
         }
+        KeyCode::Char('t') | KeyCode::Char('T')
+            if alt
+                && shift
+                && matches!(
+                    profile,
+                    KeybindingProfile::Linux
+                        | KeybindingProfile::LinuxConsole
+                        | KeybindingProfile::Windows
+                ) =>
+        {
+            Some(Command::ToggleHardTabs)
+        }
         KeyCode::Char('h') | KeyCode::Char('H') if alt && profile == KeybindingProfile::Linux => {
             Some(Command::ShowHelp)
         }
@@ -201,6 +213,7 @@ pub fn command_from_key_event_with_profile(
         }
         KeyCode::F(2) if profile == KeybindingProfile::LinuxConsole => Some(Command::Save),
         KeyCode::F(3) => Some(Command::ToggleSelectionMode),
+        KeyCode::F(4) => Some(Command::ToggleHardTabs),
         KeyCode::F(10) => Some(Command::Quit),
         KeyCode::F(12) => Some(Command::ForceQuit),
         KeyCode::Left if is_word_left(modifiers, profile) => Some(Command::Move {
@@ -316,6 +329,7 @@ fn map_ctrl_shortcut(
         'g' if shift || ch.is_ascii_uppercase() => Some(Command::ForceQuit),
         'g' => Some(Command::ForceQuit),
         's' => Some(Command::Save),
+        'h' if shift || ch.is_ascii_uppercase() => Some(Command::ToggleHardTabs),
         'h' => Some(Command::ShowHelp),
         'b' => Some(Command::ToggleBom),
         't' if alt => Some(Command::ToggleHardTabs),

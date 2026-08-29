@@ -212,6 +212,22 @@ fn outdent_selection_removes_one_tab_width_from_each_line() {
 }
 
 #[test]
+fn indent_selection_with_hard_tabs_prefixes_lines_with_tab_bytes() {
+    let mut doc = Document::from_bytes(b"one\ntwo".to_vec());
+    doc.select_all();
+    assert!(doc.indent_selection_lines_with_mode(4, true).unwrap());
+    assert_eq!(doc.bytes().unwrap(), b"\tone\n\ttwo");
+}
+
+#[test]
+fn outdent_selection_with_hard_tabs_removes_leading_tab_bytes() {
+    let mut doc = Document::from_bytes(b"\tone\n\ttwo".to_vec());
+    doc.select_all();
+    assert!(doc.outdent_selection_lines_with_mode(4, true).unwrap());
+    assert_eq!(doc.bytes().unwrap(), b"one\ntwo");
+}
+
+#[test]
 fn outdent_then_indent_does_not_spill_to_next_line_when_selection_ends_on_line_boundary() {
     let mut doc = Document::from_bytes(b"  a\n  b\nc".to_vec());
     doc.extend_selection_to(8);

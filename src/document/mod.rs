@@ -512,13 +512,26 @@ impl Document {
     }
 
     pub fn indent_selection_lines(&mut self, tab_width: usize) -> Result<bool, DocumentError> {
+        self.indent_selection_lines_with_mode(tab_width, false)
+    }
+
+    pub fn indent_selection_lines_with_mode(
+        &mut self,
+        tab_width: usize,
+        hard_tabs: bool,
+    ) -> Result<bool, DocumentError> {
         if self.selection.is_caret() || tab_width == 0 {
             return Ok(false);
         }
 
         let before_bytes = self.tree.read_all()?;
         let before_selection = self.selection;
-        let indent = vec![b' '; tab_width];
+        let indent = if hard_tabs {
+            vec![b'\t']
+        } else {
+            vec![b' '; tab_width]
+        };
+        let indent_len = indent.len();
 
         let sel_start = self.selection.start().min(before_bytes.len());
         let sel_end = self.selection.end().min(before_bytes.len());
@@ -543,7 +556,7 @@ impl Document {
         line_starts.sort_unstable();
         line_starts.dedup();
 
-        let mut out = Vec::with_capacity(before_bytes.len() + line_starts.len() * tab_width);
+        let mut out = Vec::with_capacity(before_bytes.len() + line_starts.len() * indent_len);
         let mut prev = 0usize;
         for &line_start in &line_starts {
             out.extend_from_slice(&before_bytes[prev..line_start]);
@@ -556,12 +569,12 @@ impl Document {
             .iter()
             .filter(|&&pos| pos <= before_selection.anchor.byte_offset)
             .count()
-            * tab_width;
+            * indent_len;
         let active_shift = line_starts
             .iter()
             .filter(|&&pos| pos <= before_selection.active.byte_offset)
             .count()
-            * tab_width;
+            * indent_len;
 
         self.tree.replace_all(out)?;
         self.selection.anchor = Cursor::new(before_selection.anchor.byte_offset + anchor_shift);
@@ -583,6 +596,14 @@ impl Document {
     }
 
     pub fn outdent_selection_lines(&mut self, tab_width: usize) -> Result<bool, DocumentError> {
+        self.outdent_selection_lines_with_mode(tab_width, false)
+    }
+
+    pub fn outdent_selection_lines_with_mode(
+        &mut self,
+        tab_width: usize,
+        hard_tabs: bool,
+    ) -> Result<bool, DocumentError> {
         if self.selection.is_caret() || tab_width == 0 {
             return Ok(false);
         }
@@ -613,6 +634,10 @@ impl Document {
 
         let mut removals: Vec<(usize, usize)> = Vec::new();
         for &start in &line_starts {
+            if hard_tabs && start < before_bytes.len() && before_bytes[start] == b'\t' {
+                removals.push((start, 1));
+                continue;
+            }
             let mut count = 0usize;
             while count < tab_width
                 && start + count < before_bytes.len()

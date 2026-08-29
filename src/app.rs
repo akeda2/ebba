@@ -223,7 +223,7 @@ impl AppState {
                 }
                 if ch == '\t' && !self.document.selection().is_caret() {
                     self.document
-                        .indent_selection_lines(self.tab_width)
+                        .indent_selection_lines_with_mode(self.tab_width, self.hard_tabs)
                         .map_err(|error| AppError::Message(error.to_string()))?;
                 } else {
                     let inserted = if ch == '\t' {
@@ -294,7 +294,7 @@ impl AppState {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
                 self.document
-                    .outdent_selection_lines(self.tab_width)
+                    .outdent_selection_lines_with_mode(self.tab_width, self.hard_tabs)
                     .map_err(|error| AppError::Message(error.to_string()))?;
                 Ok(CommandDisposition::Continue)
             }
@@ -899,16 +899,16 @@ fn startup_help_text(hex_mode: bool, profile: KeybindingProfile) -> String {
 
     match profile {
         KeybindingProfile::MacOs => String::from(
-            "Save: ⌘S/Ctrl+S • Help: ⇧⌘?/Ctrl+H • Quit: ⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: ⌘C/X/V, Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: ⌘A, Shift+Arrows/Shift+PgUp/Shift+PgDn •   Shift+⌥←→/Shift+⌘←→/Shift+⌘↑↓ • Select-mode: F3/Ctrl+Space • Undo: ⌘Z/Ctrl+Z • Redo: ⇧⌘Z/Ctrl+Y • Toggle BOM: Ctrl+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/⌥←→/⌘←→ •   ⌘↑↓/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: ⌥Backspace/⌘Backspace •   Ctrl+Backspace/Ctrl+U",
+            "Save: ⌘S/Ctrl+S • Help: ⇧⌘?/Ctrl+H • Quit: ⌘Q/Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: ⌘C/X/V, Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: ⌘A, Shift+Arrows/Shift+PgUp/Shift+PgDn •   Shift+⌥←→/Shift+⌘←→/Shift+⌘↑↓ • Select-mode: F3/Ctrl+Space • Undo: ⌘Z/Ctrl+Z • Redo: ⇧⌘Z/Ctrl+Y • Toggle BOM: Ctrl+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T/Ctrl+Shift+H/F4 • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/⌥←→/⌘←→ •   ⌘↑↓/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: ⌥Backspace/⌘Backspace •   Ctrl+Backspace/Ctrl+U",
         ),
         KeybindingProfile::Linux => String::from(
-            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q •   Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
+            "Save: Ctrl+S • Help: Ctrl+H/Alt+H • Quit: Ctrl+Q/Alt+Q/F10 • Force quit: Ctrl+Alt+Q/Alt+Shift+Q •   Ctrl+Shift+Q/Ctrl+G/F12 • Clipboard: Ctrl+C/X/V, Ctrl+Shift+C/V (terminal) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B/Alt+B/Ctrl+Shift+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T/Alt+Shift+T/Ctrl+Shift+H/F4 • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K/Alt+I • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
         ),
         KeybindingProfile::LinuxConsole => String::from(
-            "Save: F2/Ctrl+S • Help: F1/Alt+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G/Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V (line fallback on caret) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U • Toggle: Ctrl+B BOM, Ctrl+T tab width, Ctrl+Shift+T/Ctrl+Alt+T hard tabs, Ctrl+W wrap, Ctrl+K invisibles",
+            "Save: F2/Ctrl+S • Help: F1/Alt+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G/Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V (line fallback on caret) • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Move: Arrows/Home/End/Ctrl+←→/Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U • Toggle: Ctrl+B BOM, Ctrl+T tab width, Ctrl+Shift+T/Ctrl+Alt+T/Alt+Shift+T/Ctrl+Shift+H/F4 hard tabs, Ctrl+W wrap, Ctrl+K invisibles",
         ),
         KeybindingProfile::Windows => String::from(
-            "Save: Ctrl+S • Help: F1/Ctrl+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/Ctrl+←→ •   Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
+            "Save: Ctrl+S • Help: F1/Ctrl+H • Quit: Ctrl+Q/F10 • Force quit: Ctrl+Alt+Q/Ctrl+G •   Ctrl+Shift+Q/F12 • Clipboard: Ctrl+C/X/V • Clipboard(term): Ctrl+Shift+C/V • Select: Ctrl+A, Shift+Arrows/Shift+PgUp/Shift+PgDn • Select-mode: F3/Ctrl+Space • Undo: Ctrl+Z • Redo: Ctrl+Y/Ctrl+Shift+Z • Toggle BOM: Ctrl+B • Tab width: Ctrl+T • Hard tabs: Ctrl+Shift+T/Ctrl+Alt+T/Alt+Shift+T/Ctrl+Shift+H/F4 • Toggle wrap: Ctrl+W • Toggle invisibles: Ctrl+K • Move: Arrows/Home/End/Ctrl+←→ •   Ctrl+Home/Ctrl+End/PgUp/PgDn • Delete: Ctrl+Backspace/Ctrl+U",
         ),
     }
 }
@@ -1486,6 +1486,34 @@ mod tests {
         let mut document = Document::from_bytes(b"  a\n  b".to_vec());
         document.select_all();
         let mut app = AppState::new(document);
+        app.execute_command(Command::OutdentSelection)
+            .expect("outdent should succeed");
+        assert_eq!(
+            app.document().bytes().expect("bytes should be readable"),
+            b"a\nb"
+        );
+    }
+
+    #[test]
+    fn tab_with_selection_indents_lines_with_literal_tabs_in_hard_tabs_mode() {
+        let mut document = Document::from_bytes(b"a\nb".to_vec());
+        document.select_all();
+        let mut app = AppState::new(document);
+        app.set_hard_tabs(true);
+        app.execute_command(Command::InsertChar('\t'))
+            .expect("tab indent should succeed");
+        assert_eq!(
+            app.document().bytes().expect("bytes should be readable"),
+            b"\ta\n\tb"
+        );
+    }
+
+    #[test]
+    fn shift_tab_outdents_literal_tabs_in_hard_tabs_mode() {
+        let mut document = Document::from_bytes(b"\ta\n\tb".to_vec());
+        document.select_all();
+        let mut app = AppState::new(document);
+        app.set_hard_tabs(true);
         app.execute_command(Command::OutdentSelection)
             .expect("outdent should succeed");
         assert_eq!(
