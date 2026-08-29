@@ -139,10 +139,9 @@ pub fn command_from_key_event_with_profile(
 
     if let KeyCode::Char(ch) = code
         && super_key
+        && let Some(command) = map_super_shortcut(ch, shift, alt, profile)
     {
-        if let Some(command) = map_super_shortcut(ch, shift, alt, profile) {
-            return Some(command);
-        }
+        return Some(command);
     }
 
     if let KeyCode::Char(ch) = code
@@ -154,8 +153,7 @@ pub fn command_from_key_event_with_profile(
         }
     }
 
-    if matches!(code, KeyCode::Null | KeyCode::Char('\0'))
-    {
+    if matches!(code, KeyCode::Null | KeyCode::Char('\0')) {
         return Some(Command::ToggleSelectionMode);
     }
 

@@ -9,16 +9,12 @@ use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum LineEnding {
+    #[default]
     Lf,
     Cr,
     Crlf,
-}
-
-impl Default for LineEnding {
-    fn default() -> Self {
-        Self::Lf
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
