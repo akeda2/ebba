@@ -1,8 +1,8 @@
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ebba::command::{Command, MoveCommand};
 use ebba::input::{
     KeybindingProfile, command_from_event_with_profile, command_from_key_event_with_profile,
 };
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 fn map_default(key: KeyEvent) -> Option<Command> {
     command_from_key_event_with_profile(key, KeybindingProfile::Linux)
@@ -126,6 +126,23 @@ fn maps_f10_to_quit() {
 }
 
 #[test]
+fn maps_function_key_aliases_for_common_toggles() {
+    let cases = [
+        (KeyCode::F(1), Command::ShowHelp),
+        (KeyCode::F(2), Command::Save),
+        (KeyCode::F(5), Command::CycleTabWidth),
+        (KeyCode::F(6), Command::ToggleInvisibles),
+        (KeyCode::F(7), Command::ToggleWrap),
+        (KeyCode::F(8), Command::ToggleBom),
+        (KeyCode::F(9), Command::ShowHelp),
+    ];
+    for (code, expected) in cases {
+        let key = KeyEvent::new(code, KeyModifiers::NONE);
+        assert_eq!(map_default(key), Some(expected));
+    }
+}
+
+#[test]
 fn maps_f4_to_toggle_hard_tabs() {
     let key = KeyEvent::new(KeyCode::F(4), KeyModifiers::NONE);
     assert_eq!(map_default(key), Some(Command::ToggleHardTabs));
@@ -144,6 +161,18 @@ fn maps_alt_i_to_toggle_invisibles_in_default_profile() {
 }
 
 #[test]
+fn maps_additional_invisibles_aliases() {
+    let ctrl_dot = KeyEvent::new(KeyCode::Char('.'), KeyModifiers::CONTROL);
+    assert_eq!(map_default(ctrl_dot), Some(Command::ToggleInvisibles));
+
+    let alt_dot = KeyEvent::new(KeyCode::Char('.'), KeyModifiers::ALT);
+    assert_eq!(map_default(alt_dot), Some(Command::ToggleInvisibles));
+
+    let alt_k = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::ALT);
+    assert_eq!(map_default(alt_k), Some(Command::ToggleInvisibles));
+}
+
+#[test]
 fn maps_alt_b_to_toggle_bom_in_default_profile() {
     let key = KeyEvent::new(KeyCode::Char('b'), KeyModifiers::ALT);
     assert_eq!(map_default(key), Some(Command::ToggleBom));
@@ -153,6 +182,12 @@ fn maps_alt_b_to_toggle_bom_in_default_profile() {
 fn maps_alt_h_to_show_help_in_default_profile() {
     let key = KeyEvent::new(KeyCode::Char('h'), KeyModifiers::ALT);
     assert_eq!(map_default(key), Some(Command::ShowHelp));
+}
+
+#[test]
+fn maps_additional_help_aliases() {
+    let f9 = KeyEvent::new(KeyCode::F(9), KeyModifiers::NONE);
+    assert_eq!(map_default(f9), Some(Command::ShowHelp));
 }
 
 #[test]
@@ -222,12 +257,27 @@ fn windows_maps_f1_to_show_help() {
 }
 
 #[test]
+fn windows_maps_alt_k_to_toggle_invisibles() {
+    let alt_k = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::ALT);
+    assert_eq!(map_windows(alt_k), Some(Command::ToggleInvisibles));
+}
+
+#[test]
 fn linux_console_maps_function_key_fallbacks() {
     let help = KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE);
     assert_eq!(map_linux_console(help), Some(Command::ShowHelp));
 
     let save = KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE);
     assert_eq!(map_linux_console(save), Some(Command::Save));
+}
+
+#[test]
+fn macos_maps_function_key_help_and_save_fallbacks() {
+    let help = KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE);
+    assert_eq!(map_macos(help), Some(Command::ShowHelp));
+
+    let save = KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE);
+    assert_eq!(map_macos(save), Some(Command::Save));
 }
 
 #[test]
@@ -282,6 +332,14 @@ fn macos_maps_select_mode_toggle_shortcuts() {
 fn linux_console_maps_alt_h_to_show_help() {
     let key = KeyEvent::new(KeyCode::Char('h'), KeyModifiers::ALT);
     assert_eq!(map_linux_console(key), Some(Command::ShowHelp));
+}
+
+#[test]
+fn linux_and_windows_map_alt_s_to_selection_mode_toggle() {
+    let key = KeyEvent::new(KeyCode::Char('s'), KeyModifiers::ALT);
+    assert_eq!(map_default(key), Some(Command::ToggleSelectionMode));
+    assert_eq!(map_windows(key), Some(Command::ToggleSelectionMode));
+    assert_eq!(map_linux_console(key), Some(Command::ToggleSelectionMode));
 }
 
 #[test]

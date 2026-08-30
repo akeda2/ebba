@@ -6,13 +6,13 @@ use crate::{
     cli::Cli,
     command::{AppError, AppResult, Command, MoveCommand},
     config::{EditorConfig, LineEnding as ConfigLineEnding},
-    help::{self, HelpDetail, HelpMode},
     document::{
         Document,
         encoding::{DetectionOptions, StartupDecision, StartupPayload, detect_startup_mode},
         format::LineEndingMode,
         save::{SaveEncoding, SaveError, SaveOverrides, normalize_line_endings_buffer},
     },
+    help::{self, HelpDetail, HelpMode},
     input::{EventLoop, KeybindingProfile},
     terminal::{Terminal, TerminalModeGuard},
     ui::{
@@ -892,8 +892,6 @@ pub fn run() -> AppResult<()> {
                 status_message = None;
                 continue;
             }
-            let was_cycle_tab = matches!(&command, Command::CycleTabWidth);
-            let was_toggle_bom = matches!(&command, Command::ToggleBom);
             let was_copy_or_cut = matches!(&command, Command::Copy | Command::Cut);
             match app_state.execute_command(command) {
                 Ok(CommandDisposition::Exit) => return Ok(()),
@@ -901,11 +899,7 @@ pub fn run() -> AppResult<()> {
                     if was_copy_or_cut {
                         export_terminal_clipboard_osc52(app_state.document().clipboard());
                     }
-                    if was_cycle_tab || was_toggle_bom {
-                        status_message = None;
-                    } else {
-                        status_message = None;
-                    }
+                    status_message = None;
                     needs_render = true;
                 }
                 Err(error) => {
@@ -1169,7 +1163,10 @@ mod tests {
 
     use crate::ui::renderer::RenderState;
 
-    use super::{AppState, CommandDisposition, apply_hex_scroll, format_render_once_output, render_frame_for_state};
+    use super::{
+        AppState, CommandDisposition, apply_hex_scroll, format_render_once_output,
+        render_frame_for_state,
+    };
 
     fn fixture_path(name: &str) -> PathBuf {
         let path = PathBuf::from("target/test-fixtures");

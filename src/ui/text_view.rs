@@ -418,10 +418,8 @@ fn offset_to_line_column(
         };
         if in_line {
             let line_offset = offset.min(range.end_no_newline).saturating_sub(range.start);
-            let width = display_width_with_tabs(
-                &bytes[range.start..range.start + line_offset],
-                tab_width,
-            );
+            let width =
+                display_width_with_tabs(&bytes[range.start..range.start + line_offset], tab_width);
             return (index, width);
         }
     }

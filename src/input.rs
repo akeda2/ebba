@@ -161,11 +161,39 @@ pub fn command_from_key_event_with_profile(
         KeyCode::Char('q') if alt && shift && profile == KeybindingProfile::Linux => {
             Some(Command::ForceQuit)
         }
+        KeyCode::Char('s') | KeyCode::Char('S')
+            if alt
+                && matches!(
+                    profile,
+                    KeybindingProfile::Linux
+                        | KeybindingProfile::LinuxConsole
+                        | KeybindingProfile::Windows
+                ) =>
+        {
+            Some(Command::ToggleSelectionMode)
+        }
         KeyCode::Char('q') if alt && profile == KeybindingProfile::Linux => Some(Command::Quit),
         KeyCode::Char('Q') if alt && profile == KeybindingProfile::Linux => {
             Some(Command::ForceQuit)
         }
         KeyCode::Char('i') | KeyCode::Char('I') if alt && profile == KeybindingProfile::Linux => {
+            Some(Command::ToggleInvisibles)
+        }
+        KeyCode::Char('k') | KeyCode::Char('K')
+            if alt
+                && matches!(
+                    profile,
+                    KeybindingProfile::Linux
+                        | KeybindingProfile::LinuxConsole
+                        | KeybindingProfile::Windows
+                ) =>
+        {
+            Some(Command::ToggleInvisibles)
+        }
+        KeyCode::Char('.') if alt && profile == KeybindingProfile::Linux => {
+            Some(Command::ToggleInvisibles)
+        }
+        KeyCode::Char('.') if alt && profile == KeybindingProfile::LinuxConsole => {
             Some(Command::ToggleInvisibles)
         }
         KeyCode::Char('t') | KeyCode::Char('T')
@@ -203,17 +231,15 @@ pub fn command_from_key_event_with_profile(
         KeyCode::Backspace if alt || ctrl => Some(Command::DeleteWordBackward),
         KeyCode::Backspace => Some(Command::Backspace),
         KeyCode::Delete => Some(Command::Delete),
-        KeyCode::F(1)
-            if matches!(
-                profile,
-                KeybindingProfile::Windows | KeybindingProfile::LinuxConsole
-            ) =>
-        {
-            Some(Command::ShowHelp)
-        }
-        KeyCode::F(2) if profile == KeybindingProfile::LinuxConsole => Some(Command::Save),
+        KeyCode::F(1) => Some(Command::ShowHelp),
+        KeyCode::F(2) => Some(Command::Save),
         KeyCode::F(3) => Some(Command::ToggleSelectionMode),
         KeyCode::F(4) => Some(Command::ToggleHardTabs),
+        KeyCode::F(5) => Some(Command::CycleTabWidth),
+        KeyCode::F(6) => Some(Command::ToggleInvisibles),
+        KeyCode::F(7) => Some(Command::ToggleWrap),
+        KeyCode::F(8) => Some(Command::ToggleBom),
+        KeyCode::F(9) => Some(Command::ShowHelp),
         KeyCode::F(10) => Some(Command::Quit),
         KeyCode::F(12) => Some(Command::ForceQuit),
         KeyCode::Left if is_word_left(modifiers, profile) => Some(Command::Move {
@@ -336,6 +362,7 @@ fn map_ctrl_shortcut(
         't' if shift || ch.is_ascii_uppercase() => Some(Command::ToggleHardTabs),
         't' => Some(Command::CycleTabWidth),
         'w' => Some(Command::ToggleWrap),
+        '.' => Some(Command::ToggleInvisibles),
         'k' => Some(Command::ToggleInvisibles),
         'c' => Some(Command::Copy),
         'x' => Some(Command::Cut),

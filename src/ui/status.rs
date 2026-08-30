@@ -69,7 +69,11 @@ impl StatusLine {
                 "Select-mode:OFF"
             }
         });
-        let tab_mode = if self.hard_tabs { "TABS:HARD" } else { "TABS:SOFT" };
+        let tab_mode = if self.hard_tabs {
+            "TABS:HARD"
+        } else {
+            "TABS:SOFT"
+        };
         let line_label = if let Some((segment, total)) = self.wrapped_segment {
             format!("Ln {} ({}/{})", self.line, segment, total)
         } else {
