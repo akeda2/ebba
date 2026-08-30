@@ -241,7 +241,6 @@ pub fn command_from_key_event_with_profile(
         KeyCode::F(8) => Some(Command::ToggleBom),
         KeyCode::F(9) => Some(Command::ShowHelp),
         KeyCode::F(10) => Some(Command::Quit),
-        KeyCode::F(11) => Some(Command::ToggleInvisibles),
         KeyCode::F(12) => Some(Command::ForceQuit),
         KeyCode::Left if is_word_left(modifiers, profile) => Some(Command::Move {
             direction: MoveCommand::WordLeft,

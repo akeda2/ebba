@@ -135,7 +135,6 @@ fn maps_function_key_aliases_for_common_toggles() {
         (KeyCode::F(7), Command::ToggleWrap),
         (KeyCode::F(8), Command::ToggleBom),
         (KeyCode::F(9), Command::ShowHelp),
-        (KeyCode::F(11), Command::ToggleInvisibles),
     ];
     for (code, expected) in cases {
         let key = KeyEvent::new(code, KeyModifiers::NONE);
@@ -172,8 +171,6 @@ fn maps_additional_invisibles_aliases() {
     let alt_k = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::ALT);
     assert_eq!(map_default(alt_k), Some(Command::ToggleInvisibles));
 
-    let f11 = KeyEvent::new(KeyCode::F(11), KeyModifiers::NONE);
-    assert_eq!(map_default(f11), Some(Command::ToggleInvisibles));
 }
 
 #[test]
