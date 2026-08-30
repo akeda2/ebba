@@ -10,9 +10,10 @@ jobs:
 - name: ebba
   active: true
   path: ~/dev/ebba
+  test: cargo test --all --quiet
   build: 
-    - ~/.cargo/bin/cargo build --release
-    - ~/.cargo/bin/cargo install --path .
+    - ~/.cargo/bin/cargo build --release --quiet
+    - ~/.cargo/bin/cargo install --path . --quiet
   post-build:
     - which gb && gb -I ebba.yaml -a -w
   interval: 3600

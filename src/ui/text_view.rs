@@ -1,4 +1,4 @@
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthChar;
 
 use crate::document::Document;
 
@@ -13,6 +13,7 @@ pub struct TextViewport {
     pub wrap_column: Option<usize>,
     pub center_wrapped_text: bool,
     pub show_invisibles: bool,
+    pub tab_width: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,7 +77,8 @@ fn render_unwrapped(document: &Document, viewport: TextViewport) -> TextRenderOu
     let total_lines = ranges.len();
     let selection = document.selection();
     let cursor_offset = selection.active.byte_offset.min(bytes.len());
-    let (cursor_line, cursor_column) = offset_to_line_column(&ranges, &bytes, cursor_offset);
+    let (cursor_line, cursor_column) =
+        offset_to_line_column(&ranges, &bytes, cursor_offset, viewport.tab_width);
     let selection_start = selection.start().min(bytes.len());
     let selection_end = selection.end().min(bytes.len());
     let gutter_width = gutter_width(total_lines);
@@ -105,8 +107,19 @@ fn render_unwrapped(document: &Document, viewport: TextViewport) -> TextRenderOu
         let range = ranges[line_index];
         let ending = line_ending_kind(range, &bytes);
         let content = String::from_utf8_lossy(&bytes[range.start..line_display_end(range, &bytes)]);
-        let decorated = decorate_line_text(content.as_ref(), viewport.show_invisibles, ending);
-        let line_selection = selection_span_for_line(range, &bytes, selection_start, selection_end);
+        let decorated = decorate_line_text(
+            content.as_ref(),
+            viewport.show_invisibles,
+            ending,
+            viewport.tab_width,
+        );
+        let line_selection = selection_span_for_line(
+            range,
+            &bytes,
+            selection_start,
+            selection_end,
+            viewport.tab_width,
+        );
         let decorated_text = render_text_with_selection(&decorated, text_width, line_selection);
         let rendered = format!(
             "{:>gutter_width$} {}",
@@ -149,7 +162,8 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
     let total_lines = ranges.len();
     let selection = document.selection();
     let cursor_offset = selection.active.byte_offset.min(bytes.len());
-    let (cursor_line, cursor_column) = offset_to_line_column(&ranges, &bytes, cursor_offset);
+    let (cursor_line, cursor_column) =
+        offset_to_line_column(&ranges, &bytes, cursor_offset, viewport.tab_width);
     let selection_start = selection.start().min(bytes.len());
     let selection_end = selection.end().min(bytes.len());
     let gutter_width = gutter_width(total_lines);
@@ -176,9 +190,20 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
     for (line_index, range) in ranges.iter().copied().enumerate() {
         let ending = line_ending_kind(range, &bytes);
         let content = String::from_utf8_lossy(&bytes[range.start..line_display_end(range, &bytes)]);
-        let decorated = decorate_line_text(content.as_ref(), viewport.show_invisibles, ending);
+        let decorated = decorate_line_text(
+            content.as_ref(),
+            viewport.show_invisibles,
+            ending,
+            viewport.tab_width,
+        );
         let segments = wrap_segments(&decorated, text_width);
-        let line_selection = selection_span_for_line(range, &bytes, selection_start, selection_end);
+        let line_selection = selection_span_for_line(
+            range,
+            &bytes,
+            selection_start,
+            selection_end,
+            viewport.tab_width,
+        );
         let last_segment = segments.len().saturating_sub(1);
 
         for (segment_index, segment) in segments.iter().enumerate() {
@@ -340,32 +365,50 @@ fn decorate_line_text(
     content: &str,
     show_invisibles: bool,
     ending: Option<LineEndingKind>,
+    tab_width: usize,
 ) -> String {
-    if !show_invisibles {
-        return content.to_string();
-    }
-
     let mut out = String::with_capacity(content.len() + 2);
+    let mut column = 0usize;
     for ch in content.chars() {
-        if ch == ' ' {
-            out.push('·');
-        } else {
-            out.push(ch);
+        match ch {
+            ' ' if show_invisibles => out.push('·'),
+            '\t' => {
+                let advance = tab_advance(column, tab_width);
+                if show_invisibles {
+                    out.push('→');
+                    if advance > 1 {
+                        out.push_str(&"·".repeat(advance - 1));
+                    }
+                } else {
+                    out.push_str(&" ".repeat(advance));
+                }
+                column += advance;
+                continue;
+            }
+            _ => out.push(ch),
         }
+        column += UnicodeWidthChar::width(ch).unwrap_or(0);
     }
-    match ending {
-        Some(LineEndingKind::Lf) => out.push('␊'),
-        Some(LineEndingKind::Cr) => out.push('␍'),
-        Some(LineEndingKind::Crlf) => {
-            out.push('␍');
-            out.push('␊');
+    if show_invisibles {
+        match ending {
+            Some(LineEndingKind::Lf) => out.push('␊'),
+            Some(LineEndingKind::Cr) => out.push('␍'),
+            Some(LineEndingKind::Crlf) => {
+                out.push('␍');
+                out.push('␊');
+            }
+            None => {}
         }
-        None => {}
     }
     out
 }
 
-fn offset_to_line_column(ranges: &[LineRange], bytes: &[u8], offset: usize) -> (usize, usize) {
+fn offset_to_line_column(
+    ranges: &[LineRange],
+    bytes: &[u8],
+    offset: usize,
+    tab_width: usize,
+) -> (usize, usize) {
     for (index, range) in ranges.iter().enumerate() {
         let is_last = index + 1 == ranges.len();
         let in_line = if is_last {
@@ -375,8 +418,9 @@ fn offset_to_line_column(ranges: &[LineRange], bytes: &[u8], offset: usize) -> (
         };
         if in_line {
             let line_offset = offset.min(range.end_no_newline).saturating_sub(range.start);
-            let width = UnicodeWidthStr::width(
-                String::from_utf8_lossy(&bytes[range.start..range.start + line_offset]).as_ref(),
+            let width = display_width_with_tabs(
+                &bytes[range.start..range.start + line_offset],
+                tab_width,
             );
             return (index, width);
         }
@@ -391,14 +435,13 @@ fn selection_span_for_line(
     bytes: &[u8],
     selection_start: usize,
     selection_end: usize,
+    tab_width: usize,
 ) -> Option<SelectionSpan> {
     let start = selection_start.max(range.start).min(range.end_no_newline);
     let end = selection_end.max(range.start).min(range.end_no_newline);
 
-    let start_width =
-        UnicodeWidthStr::width(String::from_utf8_lossy(&bytes[range.start..start]).as_ref());
-    let end_width =
-        UnicodeWidthStr::width(String::from_utf8_lossy(&bytes[range.start..end]).as_ref());
+    let start_width = display_width_with_tabs(&bytes[range.start..start], tab_width);
+    let end_width = display_width_with_tabs(&bytes[range.start..end], tab_width);
     let highlight_line_break = selection_start < range.end_with_newline
         && selection_end > range.end_no_newline
         && range.end_with_newline > range.end_no_newline;
@@ -436,7 +479,10 @@ fn clip_to_width(input: &str, max_width: usize) -> String {
 
 fn fit_to_width(input: &str, width: usize) -> String {
     let clipped = clip_to_width(input, width);
-    let used = UnicodeWidthStr::width(clipped.as_str());
+    let used = clipped
+        .chars()
+        .map(|ch| UnicodeWidthChar::width(ch).unwrap_or(0))
+        .sum::<usize>();
     if used >= width {
         return clipped;
     }
@@ -444,6 +490,24 @@ fn fit_to_width(input: &str, width: usize) -> String {
     let mut padded = clipped;
     padded.push_str(&" ".repeat(width - used));
     padded
+}
+
+fn display_width_with_tabs(bytes: &[u8], tab_width: usize) -> usize {
+    let text = String::from_utf8_lossy(bytes);
+    let mut column = 0usize;
+    for ch in text.chars() {
+        if ch == '\t' {
+            column += tab_advance(column, tab_width);
+        } else {
+            column += UnicodeWidthChar::width(ch).unwrap_or(0);
+        }
+    }
+    column
+}
+
+fn tab_advance(column: usize, tab_width: usize) -> usize {
+    let width = tab_width.max(1);
+    width - (column % width)
 }
 
 fn render_text_with_selection(
@@ -550,8 +614,8 @@ mod tests {
         let bytes = b"abc\n\nx";
         let ranges = line_ranges(bytes);
 
-        assert_eq!(offset_to_line_column(&ranges, bytes, 4), (1, 0));
-        assert_eq!(offset_to_line_column(&ranges, bytes, 5), (2, 0));
+        assert_eq!(offset_to_line_column(&ranges, bytes, 4, 2), (1, 0));
+        assert_eq!(offset_to_line_column(&ranges, bytes, 5, 2), (2, 0));
     }
 
     #[test]
@@ -567,6 +631,7 @@ mod tests {
                 wrap_column: None,
                 center_wrapped_text: false,
                 show_invisibles: false,
+                tab_width: 2,
             },
         );
         assert!(rendered.lines[0].contains("abcd"));
@@ -587,6 +652,7 @@ mod tests {
                 wrap_column: Some(4),
                 center_wrapped_text: false,
                 show_invisibles: false,
+                tab_width: 2,
             },
         );
         assert!(rendered.lines[0].contains("abcd"));
@@ -607,10 +673,108 @@ mod tests {
                 wrap_column: None,
                 center_wrapped_text: false,
                 show_invisibles: true,
+                tab_width: 2,
             },
         );
         assert!(rendered.lines[0].contains("a·b␍␊"));
         assert!(rendered.lines[1].contains("x␊"));
+    }
+
+    #[test]
+    fn invisibles_show_tab_markers() {
+        let doc = Document::from_bytes(b"a\tb\n".to_vec());
+        let rendered = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 20,
+                height: 1,
+                wrap: false,
+                wrap_column: None,
+                center_wrapped_text: false,
+                show_invisibles: true,
+                tab_width: 4,
+            },
+        );
+        assert!(rendered.lines[0].contains("a→··b␊"));
+    }
+
+    #[test]
+    fn tabs_count_as_single_visual_column_for_cursor_math() {
+        let bytes = b"a\tb";
+        let ranges = line_ranges(bytes);
+        assert_eq!(offset_to_line_column(&ranges, bytes, 0, 4), (0, 0));
+        assert_eq!(offset_to_line_column(&ranges, bytes, 1, 4), (0, 1));
+        assert_eq!(offset_to_line_column(&ranges, bytes, 2, 4), (0, 4));
+        assert_eq!(offset_to_line_column(&ranges, bytes, 3, 4), (0, 5));
+    }
+
+    #[test]
+    fn literal_tabs_expand_to_active_tab_stops() {
+        let doc = Document::from_bytes(b"a\tb".to_vec());
+        let rendered = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 20,
+                height: 1,
+                wrap: false,
+                wrap_column: None,
+                center_wrapped_text: false,
+                show_invisibles: false,
+                tab_width: 4,
+            },
+        );
+        assert!(rendered.lines[0].contains("a   b"));
+    }
+
+    #[test]
+    fn invisibles_tab_marker_expands_to_active_tab_width() {
+        let doc = Document::from_bytes(b"\t".to_vec());
+        let rendered_2 = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 20,
+                height: 1,
+                wrap: false,
+                wrap_column: None,
+                center_wrapped_text: false,
+                show_invisibles: true,
+                tab_width: 2,
+            },
+        );
+        assert!(rendered_2.lines[0].contains("→·"));
+
+        let rendered_4 = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 20,
+                height: 1,
+                wrap: false,
+                wrap_column: None,
+                center_wrapped_text: false,
+                show_invisibles: true,
+                tab_width: 4,
+            },
+        );
+        assert!(rendered_4.lines[0].contains("→···"));
+
+        let rendered_8 = TextView::render(
+            &doc,
+            TextViewport {
+                first_row: 0,
+                width: 20,
+                height: 1,
+                wrap: false,
+                wrap_column: None,
+                center_wrapped_text: false,
+                show_invisibles: true,
+                tab_width: 8,
+            },
+        );
+        assert!(rendered_8.lines[0].contains("→·······"));
     }
 
     #[test]
@@ -626,6 +790,7 @@ mod tests {
                 wrap_column: None,
                 center_wrapped_text: false,
                 show_invisibles: true,
+                tab_width: 2,
             },
         );
         // Bare CR renders as a lone `␍`, distinct from CRLF's `␍␊` pair.
@@ -647,6 +812,7 @@ mod tests {
                 wrap_column: None,
                 center_wrapped_text: false,
                 show_invisibles: false,
+                tab_width: 2,
             },
         );
         assert!(rendered.lines[0].contains("one"));
@@ -669,6 +835,7 @@ mod tests {
                 wrap_column: Some(4),
                 center_wrapped_text: true,
                 show_invisibles: false,
+                tab_width: 2,
             },
         );
         assert_eq!(rendered.lines[0], "   1      abcd");
@@ -689,6 +856,7 @@ mod tests {
                 wrap_column: Some(80),
                 center_wrapped_text: true,
                 show_invisibles: false,
+                tab_width: 2,
             },
         );
         assert_eq!(rendered.lines[0], "   1 abc");

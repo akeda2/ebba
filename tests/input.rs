@@ -1,13 +1,8 @@
-#[path = "../src/command.rs"]
-mod command;
-#[path = "../src/input.rs"]
-mod input;
-
-use command::{Command, MoveCommand};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use input::{
+use ebba::command::{Command, MoveCommand};
+use ebba::input::{
     KeybindingProfile, command_from_event_with_profile, command_from_key_event_with_profile,
 };
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 fn map_default(key: KeyEvent) -> Option<Command> {
     command_from_key_event_with_profile(key, KeybindingProfile::Linux)
@@ -74,6 +69,39 @@ fn maps_core_ctrl_shortcuts() {
 }
 
 #[test]
+fn maps_ctrl_shift_t_to_toggle_hard_tabs() {
+    let key = KeyEvent::new(
+        KeyCode::Char('t'),
+        KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+    );
+    assert_eq!(map_default(key), Some(Command::ToggleHardTabs));
+}
+
+#[test]
+fn maps_ctrl_alt_t_to_toggle_hard_tabs() {
+    let key = KeyEvent::new(
+        KeyCode::Char('t'),
+        KeyModifiers::CONTROL | KeyModifiers::ALT,
+    );
+    assert_eq!(map_default(key), Some(Command::ToggleHardTabs));
+}
+
+#[test]
+fn maps_ctrl_shift_h_to_toggle_hard_tabs() {
+    let key = KeyEvent::new(
+        KeyCode::Char('h'),
+        KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+    );
+    assert_eq!(map_default(key), Some(Command::ToggleHardTabs));
+}
+
+#[test]
+fn maps_alt_shift_t_to_toggle_hard_tabs_on_linux() {
+    let key = KeyEvent::new(KeyCode::Char('T'), KeyModifiers::ALT | KeyModifiers::SHIFT);
+    assert_eq!(map_default(key), Some(Command::ToggleHardTabs));
+}
+
+#[test]
 fn maps_ctrl_q_control_character_form_to_quit() {
     let key = KeyEvent::new(KeyCode::Char('\u{11}'), KeyModifiers::NONE);
     assert_eq!(map_default(key), Some(Command::Quit));
@@ -95,6 +123,12 @@ fn maps_alt_q_to_quit_in_default_profile() {
 fn maps_f10_to_quit() {
     let key = KeyEvent::new(KeyCode::F(10), KeyModifiers::NONE);
     assert_eq!(map_default(key), Some(Command::Quit));
+}
+
+#[test]
+fn maps_f4_to_toggle_hard_tabs() {
+    let key = KeyEvent::new(KeyCode::F(4), KeyModifiers::NONE);
+    assert_eq!(map_default(key), Some(Command::ToggleHardTabs));
 }
 
 #[test]
