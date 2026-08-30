@@ -172,7 +172,20 @@ pub fn command_from_key_event_with_profile(
             if alt
                 && matches!(
                     profile,
-                    KeybindingProfile::Linux | KeybindingProfile::LinuxConsole
+                    KeybindingProfile::Linux
+                        | KeybindingProfile::LinuxConsole
+                        | KeybindingProfile::Windows
+                ) =>
+        {
+            Some(Command::ToggleInvisibles)
+        }
+        KeyCode::Char(';')
+            if alt
+                && matches!(
+                    profile,
+                    KeybindingProfile::Linux
+                        | KeybindingProfile::LinuxConsole
+                        | KeybindingProfile::Windows
                 ) =>
         {
             Some(Command::ToggleInvisibles)
@@ -350,6 +363,7 @@ fn map_ctrl_shortcut(
         't' if shift || ch.is_ascii_uppercase() => Some(Command::ToggleHardTabs),
         't' => Some(Command::CycleTabWidth),
         'w' => Some(Command::ToggleWrap),
+        ';' => Some(Command::ToggleInvisibles),
         '.' => Some(Command::ToggleInvisibles),
         'k' => Some(Command::ToggleInvisibles),
         'c' => Some(Command::Copy),
