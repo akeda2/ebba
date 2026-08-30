@@ -134,6 +134,8 @@ fn maps_function_key_aliases_for_common_toggles() {
         (KeyCode::F(6), Command::ToggleInvisibles),
         (KeyCode::F(7), Command::ToggleWrap),
         (KeyCode::F(8), Command::ToggleBom),
+        (KeyCode::F(9), Command::ShowHelp),
+        (KeyCode::F(11), Command::ToggleInvisibles),
     ];
     for (code, expected) in cases {
         let key = KeyEvent::new(code, KeyModifiers::NONE);
@@ -160,6 +162,21 @@ fn maps_alt_i_to_toggle_invisibles_in_default_profile() {
 }
 
 #[test]
+fn maps_additional_invisibles_aliases() {
+    let ctrl_dot = KeyEvent::new(KeyCode::Char('.'), KeyModifiers::CONTROL);
+    assert_eq!(map_default(ctrl_dot), Some(Command::ToggleInvisibles));
+
+    let alt_dot = KeyEvent::new(KeyCode::Char('.'), KeyModifiers::ALT);
+    assert_eq!(map_default(alt_dot), Some(Command::ToggleInvisibles));
+
+    let alt_k = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::ALT);
+    assert_eq!(map_default(alt_k), Some(Command::ToggleInvisibles));
+
+    let f11 = KeyEvent::new(KeyCode::F(11), KeyModifiers::NONE);
+    assert_eq!(map_default(f11), Some(Command::ToggleInvisibles));
+}
+
+#[test]
 fn maps_alt_b_to_toggle_bom_in_default_profile() {
     let key = KeyEvent::new(KeyCode::Char('b'), KeyModifiers::ALT);
     assert_eq!(map_default(key), Some(Command::ToggleBom));
@@ -169,6 +186,12 @@ fn maps_alt_b_to_toggle_bom_in_default_profile() {
 fn maps_alt_h_to_show_help_in_default_profile() {
     let key = KeyEvent::new(KeyCode::Char('h'), KeyModifiers::ALT);
     assert_eq!(map_default(key), Some(Command::ShowHelp));
+}
+
+#[test]
+fn maps_additional_help_aliases() {
+    let f9 = KeyEvent::new(KeyCode::F(9), KeyModifiers::NONE);
+    assert_eq!(map_default(f9), Some(Command::ShowHelp));
 }
 
 #[test]

@@ -168,6 +168,21 @@ pub fn command_from_key_event_with_profile(
         KeyCode::Char('i') | KeyCode::Char('I') if alt && profile == KeybindingProfile::Linux => {
             Some(Command::ToggleInvisibles)
         }
+        KeyCode::Char('k') | KeyCode::Char('K')
+            if alt
+                && matches!(
+                    profile,
+                    KeybindingProfile::Linux | KeybindingProfile::LinuxConsole
+                ) =>
+        {
+            Some(Command::ToggleInvisibles)
+        }
+        KeyCode::Char('.') if alt && profile == KeybindingProfile::Linux => {
+            Some(Command::ToggleInvisibles)
+        }
+        KeyCode::Char('.') if alt && profile == KeybindingProfile::LinuxConsole => {
+            Some(Command::ToggleInvisibles)
+        }
         KeyCode::Char('t') | KeyCode::Char('T')
             if alt
                 && shift
@@ -211,7 +226,9 @@ pub fn command_from_key_event_with_profile(
         KeyCode::F(6) => Some(Command::ToggleInvisibles),
         KeyCode::F(7) => Some(Command::ToggleWrap),
         KeyCode::F(8) => Some(Command::ToggleBom),
+        KeyCode::F(9) => Some(Command::ShowHelp),
         KeyCode::F(10) => Some(Command::Quit),
+        KeyCode::F(11) => Some(Command::ToggleInvisibles),
         KeyCode::F(12) => Some(Command::ForceQuit),
         KeyCode::Left if is_word_left(modifiers, profile) => Some(Command::Move {
             direction: MoveCommand::WordLeft,
@@ -333,6 +350,7 @@ fn map_ctrl_shortcut(
         't' if shift || ch.is_ascii_uppercase() => Some(Command::ToggleHardTabs),
         't' => Some(Command::CycleTabWidth),
         'w' => Some(Command::ToggleWrap),
+        '.' => Some(Command::ToggleInvisibles),
         'k' => Some(Command::ToggleInvisibles),
         'c' => Some(Command::Copy),
         'x' => Some(Command::Cut),
