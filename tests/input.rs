@@ -126,6 +126,22 @@ fn maps_f10_to_quit() {
 }
 
 #[test]
+fn maps_function_key_aliases_for_common_toggles() {
+    let cases = [
+        (KeyCode::F(1), Command::ShowHelp),
+        (KeyCode::F(2), Command::Save),
+        (KeyCode::F(5), Command::CycleTabWidth),
+        (KeyCode::F(6), Command::ToggleInvisibles),
+        (KeyCode::F(7), Command::ToggleWrap),
+        (KeyCode::F(8), Command::ToggleBom),
+    ];
+    for (code, expected) in cases {
+        let key = KeyEvent::new(code, KeyModifiers::NONE);
+        assert_eq!(map_default(key), Some(expected));
+    }
+}
+
+#[test]
 fn maps_f4_to_toggle_hard_tabs() {
     let key = KeyEvent::new(KeyCode::F(4), KeyModifiers::NONE);
     assert_eq!(map_default(key), Some(Command::ToggleHardTabs));
@@ -228,6 +244,15 @@ fn linux_console_maps_function_key_fallbacks() {
 
     let save = KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE);
     assert_eq!(map_linux_console(save), Some(Command::Save));
+}
+
+#[test]
+fn macos_maps_function_key_help_and_save_fallbacks() {
+    let help = KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE);
+    assert_eq!(map_macos(help), Some(Command::ShowHelp));
+
+    let save = KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE);
+    assert_eq!(map_macos(save), Some(Command::Save));
 }
 
 #[test]

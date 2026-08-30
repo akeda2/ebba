@@ -203,17 +203,14 @@ pub fn command_from_key_event_with_profile(
         KeyCode::Backspace if alt || ctrl => Some(Command::DeleteWordBackward),
         KeyCode::Backspace => Some(Command::Backspace),
         KeyCode::Delete => Some(Command::Delete),
-        KeyCode::F(1)
-            if matches!(
-                profile,
-                KeybindingProfile::Windows | KeybindingProfile::LinuxConsole
-            ) =>
-        {
-            Some(Command::ShowHelp)
-        }
-        KeyCode::F(2) if profile == KeybindingProfile::LinuxConsole => Some(Command::Save),
+        KeyCode::F(1) => Some(Command::ShowHelp),
+        KeyCode::F(2) => Some(Command::Save),
         KeyCode::F(3) => Some(Command::ToggleSelectionMode),
         KeyCode::F(4) => Some(Command::ToggleHardTabs),
+        KeyCode::F(5) => Some(Command::CycleTabWidth),
+        KeyCode::F(6) => Some(Command::ToggleInvisibles),
+        KeyCode::F(7) => Some(Command::ToggleWrap),
+        KeyCode::F(8) => Some(Command::ToggleBom),
         KeyCode::F(10) => Some(Command::Quit),
         KeyCode::F(12) => Some(Command::ForceQuit),
         KeyCode::Left if is_word_left(modifiers, profile) => Some(Command::Move {
