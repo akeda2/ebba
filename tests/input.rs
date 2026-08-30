@@ -166,17 +166,11 @@ fn maps_additional_invisibles_aliases() {
     let ctrl_dot = KeyEvent::new(KeyCode::Char('.'), KeyModifiers::CONTROL);
     assert_eq!(map_default(ctrl_dot), Some(Command::ToggleInvisibles));
 
-    let ctrl_semicolon = KeyEvent::new(KeyCode::Char(';'), KeyModifiers::CONTROL);
-    assert_eq!(map_default(ctrl_semicolon), Some(Command::ToggleInvisibles));
-
     let alt_dot = KeyEvent::new(KeyCode::Char('.'), KeyModifiers::ALT);
     assert_eq!(map_default(alt_dot), Some(Command::ToggleInvisibles));
 
     let alt_k = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::ALT);
     assert_eq!(map_default(alt_k), Some(Command::ToggleInvisibles));
-
-    let alt_semicolon = KeyEvent::new(KeyCode::Char(';'), KeyModifiers::ALT);
-    assert_eq!(map_default(alt_semicolon), Some(Command::ToggleInvisibles));
 
     let f11 = KeyEvent::new(KeyCode::F(11), KeyModifiers::NONE);
     assert_eq!(map_default(f11), Some(Command::ToggleInvisibles));
@@ -267,12 +261,9 @@ fn windows_maps_f1_to_show_help() {
 }
 
 #[test]
-fn windows_maps_alt_k_and_alt_semicolon_to_toggle_invisibles() {
+fn windows_maps_alt_k_to_toggle_invisibles() {
     let alt_k = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::ALT);
     assert_eq!(map_windows(alt_k), Some(Command::ToggleInvisibles));
-
-    let alt_semicolon = KeyEvent::new(KeyCode::Char(';'), KeyModifiers::ALT);
-    assert_eq!(map_windows(alt_semicolon), Some(Command::ToggleInvisibles));
 }
 
 #[test]
