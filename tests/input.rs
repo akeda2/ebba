@@ -1,13 +1,8 @@
-#[path = "../src/command.rs"]
-mod command;
-#[path = "../src/input.rs"]
-mod input;
-
-use command::{Command, MoveCommand};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use input::{
+use ebba::command::{Command, MoveCommand};
+use ebba::input::{
     KeybindingProfile, command_from_event_with_profile, command_from_key_event_with_profile,
 };
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 fn map_default(key: KeyEvent) -> Option<Command> {
     command_from_key_event_with_profile(key, KeybindingProfile::Linux)

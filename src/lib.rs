@@ -1,4 +1,9 @@
+pub mod app;
+pub mod cli;
 pub mod command;
 pub mod config;
 pub mod document;
+pub mod help;
+pub mod input;
+pub mod terminal;
 pub mod ui;
