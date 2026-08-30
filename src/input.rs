@@ -161,6 +161,17 @@ pub fn command_from_key_event_with_profile(
         KeyCode::Char('q') if alt && shift && profile == KeybindingProfile::Linux => {
             Some(Command::ForceQuit)
         }
+        KeyCode::Char('s') | KeyCode::Char('S')
+            if alt
+                && matches!(
+                    profile,
+                    KeybindingProfile::Linux
+                        | KeybindingProfile::LinuxConsole
+                        | KeybindingProfile::Windows
+                ) =>
+        {
+            Some(Command::ToggleSelectionMode)
+        }
         KeyCode::Char('q') if alt && profile == KeybindingProfile::Linux => Some(Command::Quit),
         KeyCode::Char('Q') if alt && profile == KeybindingProfile::Linux => {
             Some(Command::ForceQuit)

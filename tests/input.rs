@@ -339,6 +339,14 @@ fn linux_console_maps_alt_h_to_show_help() {
 }
 
 #[test]
+fn linux_and_windows_map_alt_s_to_selection_mode_toggle() {
+    let key = KeyEvent::new(KeyCode::Char('s'), KeyModifiers::ALT);
+    assert_eq!(map_default(key), Some(Command::ToggleSelectionMode));
+    assert_eq!(map_windows(key), Some(Command::ToggleSelectionMode));
+    assert_eq!(map_linux_console(key), Some(Command::ToggleSelectionMode));
+}
+
+#[test]
 fn linux_console_does_not_consume_linux_alt_aliases() {
     let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::ALT);
     assert_eq!(map_linux_console(key), None);
