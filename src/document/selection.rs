@@ -51,6 +51,10 @@ impl Selection {
         self.end() - self.start()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn set_active(&mut self, byte_offset: usize) {
         self.active = Cursor::new(byte_offset);
     }

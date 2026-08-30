@@ -219,11 +219,7 @@ fn requested_keymap_from_args() -> Option<KeymapMode> {
 fn parse_keymap_arg(arg: &OsString) -> Option<OsString> {
     let arg = arg.to_string_lossy();
     let prefix = "--keymap=";
-    if arg.starts_with(prefix) {
-        Some(OsString::from(&arg[prefix.len()..]))
-    } else {
-        None
-    }
+    arg.strip_prefix(prefix).map(OsString::from)
 }
 
 fn parse_keymap_mode(value: &OsString) -> Option<KeymapMode> {

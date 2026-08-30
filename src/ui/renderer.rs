@@ -143,6 +143,18 @@ pub struct Renderer;
 
 const HEADER_SEPARATOR_RIGHT_MARGIN: usize = 3;
 
+#[derive(Debug, Clone, Copy)]
+struct TextRenderOptions<'a> {
+    document: &'a Document,
+    body_width: usize,
+    body_height: usize,
+    wrap: bool,
+    wrap_column: Option<usize>,
+    center_wrapped_text: bool,
+    show_invisibles: bool,
+    tab_width: usize,
+}
+
 impl Renderer {
     pub fn wrapped_header_lines(header_message: Option<&str>, width: usize) -> Vec<String> {
         let Some(message) = header_message else {
@@ -181,14 +193,16 @@ impl Renderer {
             } => {
                 let mut text = self.render_text(
                     state,
-                    document,
-                    body_width,
-                    body_height,
-                    wrap,
-                    wrap_column,
-                    center_wrapped_text,
-                    show_invisibles,
-                    tab_width,
+                    TextRenderOptions {
+                        document,
+                        body_width,
+                        body_height,
+                        wrap,
+                        wrap_column,
+                        center_wrapped_text,
+                        show_invisibles,
+                        tab_width,
+                    },
                 );
                 status = status.with_position(
                     text.status_line + 1,
@@ -230,16 +244,19 @@ impl Renderer {
     fn render_text(
         &self,
         state: &mut RenderState,
-        document: &Document,
-        body_width: usize,
-        body_height: usize,
-        wrap: bool,
-        wrap_column: Option<usize>,
-        center_wrapped_text: bool,
-        show_invisibles: bool,
-        tab_width: usize,
+        options: TextRenderOptions<'_>,
     ) -> TextRenderOutput {
         let previous_scroll = state.scroll_row;
+        let TextRenderOptions {
+            document,
+            body_width,
+            body_height,
+            wrap,
+            wrap_column,
+            center_wrapped_text,
+            show_invisibles,
+            tab_width,
+        } = options;
         let mut rendered = TextView::render(
             document,
             TextViewport {

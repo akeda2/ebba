@@ -1,8 +1,8 @@
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ebba::command::{Command, MoveCommand};
 use ebba::input::{
     KeybindingProfile, command_from_event_with_profile, command_from_key_event_with_profile,
 };
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 fn map_default(key: KeyEvent) -> Option<Command> {
     command_from_key_event_with_profile(key, KeybindingProfile::Linux)
@@ -170,7 +170,6 @@ fn maps_additional_invisibles_aliases() {
 
     let alt_k = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::ALT);
     assert_eq!(map_default(alt_k), Some(Command::ToggleInvisibles));
-
 }
 
 #[test]
