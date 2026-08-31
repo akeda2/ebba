@@ -454,7 +454,11 @@ mod tests {
     fn writer_flush_applies_background_only_to_body_rows() {
         let mut sink = Vec::<u8>::new();
         let frame = RenderFrame {
-            lines: vec!["header".to_string(), "status".to_string(), "body".to_string()],
+            lines: vec![
+                "header".to_string(),
+                "status".to_string(),
+                "body".to_string(),
+            ],
             cursor: None,
             body_start_row: 2,
             background_color: BackgroundColor::DarkGray,

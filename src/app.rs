@@ -17,8 +17,8 @@ use crate::{
     terminal::{Terminal, TerminalModeGuard},
     ui::{
         renderer::{
-            BackgroundColor, RenderFrame, RenderMode, RenderRequest, RenderState, Renderer, TerminalFlush,
-            WriterFlush,
+            BackgroundColor, RenderFrame, RenderMode, RenderRequest, RenderState, Renderer,
+            TerminalFlush, WriterFlush,
         },
         status::StatusLine,
     },
