@@ -300,7 +300,8 @@ impl AppState {
                 self.background_color = match self.background_color {
                     BackgroundColor::DarkGray => BackgroundColor::LightGray,
                     BackgroundColor::LightGray => BackgroundColor::Black,
-                    BackgroundColor::Black => BackgroundColor::DarkGray,
+                    BackgroundColor::Black => BackgroundColor::Blue,
+                    BackgroundColor::Blue => BackgroundColor::DarkGray,
                 };
                 Ok(CommandDisposition::Continue)
             }
@@ -1325,7 +1326,7 @@ mod tests {
     }
 
     #[test]
-    fn toggle_background_cycles_between_dark_gray_and_black() {
+    fn toggle_background_cycles_all_modes() {
         let document = Document::from_bytes(Vec::new());
         let mut app = AppState::new(document);
         assert_eq!(app.background_color(), BackgroundColor::DarkGray);
@@ -1335,6 +1336,9 @@ mod tests {
         app.execute_command(Command::ToggleBackground)
             .expect("toggle background should succeed");
         assert_eq!(app.background_color(), BackgroundColor::Black);
+        app.execute_command(Command::ToggleBackground)
+            .expect("toggle background should succeed");
+        assert_eq!(app.background_color(), BackgroundColor::Blue);
         app.execute_command(Command::ToggleBackground)
             .expect("toggle background should succeed");
         assert_eq!(app.background_color(), BackgroundColor::DarkGray);
