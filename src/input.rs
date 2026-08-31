@@ -161,6 +161,17 @@ pub fn command_from_key_event_with_profile(
         KeyCode::Char('q') if alt && shift && profile == KeybindingProfile::Linux => {
             Some(Command::ForceQuit)
         }
+        KeyCode::Char('r') | KeyCode::Char('R')
+            if alt
+                && matches!(
+                    profile,
+                    KeybindingProfile::Linux
+                        | KeybindingProfile::LinuxConsole
+                        | KeybindingProfile::Windows
+                ) =>
+        {
+            Some(Command::ToggleBackground)
+        }
         KeyCode::Char('s') | KeyCode::Char('S')
             if alt
                 && matches!(
@@ -371,6 +382,7 @@ fn map_ctrl_shortcut(
         'z' if shift || ch.is_ascii_uppercase() => Some(Command::Redo),
         'z' => Some(Command::Undo),
         'y' => Some(Command::Redo),
+        'r' => Some(Command::ToggleBackground),
         'u' => Some(Command::DeleteToLineStart),
         _ => None,
     }

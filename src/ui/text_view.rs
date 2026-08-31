@@ -537,7 +537,7 @@ fn render_text_with_selection(
             out.push_str("\x1b[7m");
             inverse_on = true;
         } else if !should_inverse && inverse_on {
-            out.push_str("\x1b[0m");
+            out.push_str("\x1b[27m");
             inverse_on = false;
         }
 
@@ -546,10 +546,10 @@ fn render_text_with_selection(
     }
 
     if inverse_on {
-        out.push_str("\x1b[0m");
+        out.push_str("\x1b[27m");
     }
     if used < width && selection.is_some_and(|sel| sel.highlight_line_break) {
-        out.push_str("\x1b[7m \x1b[0m");
+        out.push_str("\x1b[7m \x1b[27m");
         used += 1;
     }
     if used < width {

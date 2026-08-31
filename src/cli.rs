@@ -6,6 +6,7 @@ use crate::document::encoding::ContentOverride;
 use crate::document::format::LineEndingMode;
 use crate::help;
 use crate::input::KeybindingProfile;
+use crate::ui::renderer::BackgroundColor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum LineEnding {
@@ -22,6 +23,13 @@ pub enum KeymapMode {
     Linux,
     LinuxConsole,
     Windows,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum BackgroundMode {
+    DarkGray,
+    LightGray,
+    Black,
 }
 
 #[derive(Debug, Parser)]
@@ -80,6 +88,12 @@ pub struct Cli {
         help = "Show invisible characters (spaces as ·, LF as ␊, CRLF as ␍)"
     )]
     pub invisibles: bool,
+    #[arg(
+        long,
+        value_enum,
+        help = "Set editor background color (dark-gray, light-gray, or black)"
+    )]
+    pub background: Option<BackgroundMode>,
     #[arg(
         long,
         value_parser = parse_tab_width,
@@ -181,6 +195,14 @@ impl Cli {
         keymap_mode_to_profile(self.keymap)
     }
 
+    pub fn background_color(&self) -> BackgroundColor {
+        match self.background.unwrap_or(BackgroundMode::DarkGray) {
+            BackgroundMode::DarkGray => BackgroundColor::DarkGray,
+            BackgroundMode::LightGray => BackgroundColor::LightGray,
+            BackgroundMode::Black => BackgroundColor::Black,
+        }
+    }
+
     fn key_bindings_help(profile: KeybindingProfile) -> String {
         help::cli_key_bindings_help(profile)
     }
@@ -247,8 +269,9 @@ mod tests {
 
     use clap::Parser;
 
-    use super::{Cli, KeymapMode, LineEnding, parse_keymap_mode};
+    use super::{BackgroundMode, Cli, KeymapMode, LineEnding, parse_keymap_mode};
     use crate::input::KeybindingProfile;
+    use crate::ui::renderer::BackgroundColor;
 
     fn base_cli() -> Cli {
         Cli {
@@ -260,6 +283,7 @@ mod tests {
             wrap: None,
             center: false,
             invisibles: false,
+            background: None,
             tab_width: None,
             render_once: false,
             render_width: 80,
@@ -313,6 +337,8 @@ mod tests {
             "80",
             "-c",
             "-i",
+            "--background",
+            "black",
             "--tab-width",
             "8",
             "--hard-tabs",
@@ -329,6 +355,7 @@ mod tests {
         assert_eq!(cli.wrap, Some(Some(80)));
         assert!(cli.center);
         assert!(cli.invisibles);
+        assert_eq!(cli.background, Some(BackgroundMode::Black));
         assert_eq!(cli.tab_width, Some(8));
         assert!(cli.hard_tabs);
         assert_eq!(cli.config, Some(PathBuf::from("config.yaml")));
@@ -390,5 +417,19 @@ mod tests {
     fn rejects_unsupported_tab_width() {
         let parsed = Cli::try_parse_from(["ebba", "README.md", "--tab-width", "3"]);
         assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn defaults_background_to_dark_gray() {
+        let cli = Cli::try_parse_from(["ebba", "README.md"]).expect("default parse should work");
+        assert_eq!(cli.background_color(), BackgroundColor::DarkGray);
+    }
+
+    #[test]
+    fn parses_light_gray_background() {
+        let cli = Cli::try_parse_from(["ebba", "README.md", "--background", "light-gray"])
+            .expect("light-gray background should parse");
+        assert_eq!(cli.background, Some(BackgroundMode::LightGray));
+        assert_eq!(cli.background_color(), BackgroundColor::LightGray);
     }
 }

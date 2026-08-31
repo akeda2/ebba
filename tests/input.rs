@@ -59,6 +59,7 @@ fn maps_core_ctrl_shortcuts() {
         (KeyCode::Char('t'), Command::CycleTabWidth),
         (KeyCode::Char('w'), Command::ToggleWrap),
         (KeyCode::Char('k'), Command::ToggleInvisibles),
+        (KeyCode::Char('r'), Command::ToggleBackground),
         (KeyCode::Char('u'), Command::DeleteToLineStart),
     ];
 
@@ -340,6 +341,14 @@ fn linux_and_windows_map_alt_s_to_selection_mode_toggle() {
     assert_eq!(map_default(key), Some(Command::ToggleSelectionMode));
     assert_eq!(map_windows(key), Some(Command::ToggleSelectionMode));
     assert_eq!(map_linux_console(key), Some(Command::ToggleSelectionMode));
+}
+
+#[test]
+fn linux_and_windows_map_alt_r_to_background_toggle() {
+    let key = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::ALT);
+    assert_eq!(map_default(key), Some(Command::ToggleBackground));
+    assert_eq!(map_windows(key), Some(Command::ToggleBackground));
+    assert_eq!(map_linux_console(key), Some(Command::ToggleBackground));
 }
 
 #[test]
