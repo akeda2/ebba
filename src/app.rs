@@ -17,8 +17,8 @@ use crate::{
     terminal::{Terminal, TerminalModeGuard},
     ui::{
         renderer::{
-            RenderFrame, RenderMode, RenderRequest, RenderState, Renderer, TerminalFlush,
-            WriterFlush,
+            BackgroundColor, RenderFrame, RenderMode, RenderRequest, RenderState, Renderer,
+            TerminalFlush, WriterFlush,
         },
         status::StatusLine,
     },
@@ -50,6 +50,7 @@ pub struct AppState {
     wrap_column: Option<usize>,
     wrap_centered: bool,
     show_invisibles: bool,
+    background_color: BackgroundColor,
     selection_mode: bool,
     keybinding_profile: KeybindingProfile,
 }
@@ -78,6 +79,7 @@ impl AppState {
             wrap_column: None,
             wrap_centered: false,
             show_invisibles: false,
+            background_color: BackgroundColor::DarkGray,
             selection_mode: false,
             keybinding_profile: KeybindingProfile::current(),
         }
@@ -177,6 +179,14 @@ impl AppState {
 
     pub fn show_invisibles(&self) -> bool {
         self.show_invisibles
+    }
+
+    pub fn background_color(&self) -> BackgroundColor {
+        self.background_color
+    }
+
+    pub fn set_background_color(&mut self, background_color: BackgroundColor) {
+        self.background_color = background_color;
     }
 
     pub fn selection_mode_enabled(&self) -> bool {
@@ -284,6 +294,14 @@ impl AppState {
             }
             Command::ToggleInvisibles => {
                 self.show_invisibles = !self.show_invisibles;
+                Ok(CommandDisposition::Continue)
+            }
+            Command::ToggleBackground => {
+                self.background_color = match self.background_color {
+                    BackgroundColor::DarkGray => BackgroundColor::LightGray,
+                    BackgroundColor::LightGray => BackgroundColor::Black,
+                    BackgroundColor::Black => BackgroundColor::DarkGray,
+                };
                 Ok(CommandDisposition::Continue)
             }
             Command::ToggleSelectionMode => {
@@ -612,6 +630,7 @@ fn render_frame_for_state(
                 mode: RenderMode::Hex { bytes: &bytes },
                 status,
                 header_message,
+                background_color: app_state.background_color(),
             },
         ))
     } else {
@@ -628,6 +647,7 @@ fn render_frame_for_state(
                 },
                 status,
                 header_message,
+                background_color: app_state.background_color(),
             },
         ))
     }
@@ -744,6 +764,7 @@ pub fn run() -> AppResult<()> {
     app_state.set_read_only(read_only);
     app_state.set_keybinding_profile(keybinding_profile);
     app_state.set_show_invisibles(args.invisibles);
+    app_state.set_background_color(args.background_color());
     if let Some(tab_width) = args.tab_width {
         app_state.set_tab_width(tab_width);
     }
@@ -1161,7 +1182,7 @@ mod tests {
     use crate::document::format::{LineEndingMode, analyze_line_endings};
     use crate::document::save::{SaveEncoding, SaveOverrides};
 
-    use crate::ui::renderer::RenderState;
+    use crate::ui::renderer::{BackgroundColor, RenderState};
 
     use super::{
         AppState, CommandDisposition, apply_hex_scroll, format_render_once_output,
@@ -1276,6 +1297,8 @@ mod tests {
         let frame = crate::ui::renderer::RenderFrame {
             lines: vec!["status".to_string(), "body".to_string()],
             cursor: Some((1, 4)),
+            body_start_row: 1,
+            background_color: BackgroundColor::DarkGray,
         };
         let output = format_render_once_output(&frame);
         assert!(output.contains("# cursor: 2,5"));
@@ -1299,6 +1322,22 @@ mod tests {
         app.execute_command(Command::ToggleInvisibles)
             .expect("toggle invisibles should succeed");
         assert!(app.show_invisibles());
+    }
+
+    #[test]
+    fn toggle_background_cycles_between_dark_gray_and_black() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        assert_eq!(app.background_color(), BackgroundColor::DarkGray);
+        app.execute_command(Command::ToggleBackground)
+            .expect("toggle background should succeed");
+        assert_eq!(app.background_color(), BackgroundColor::LightGray);
+        app.execute_command(Command::ToggleBackground)
+            .expect("toggle background should succeed");
+        assert_eq!(app.background_color(), BackgroundColor::Black);
+        app.execute_command(Command::ToggleBackground)
+            .expect("toggle background should succeed");
+        assert_eq!(app.background_color(), BackgroundColor::DarkGray);
     }
 
     #[test]

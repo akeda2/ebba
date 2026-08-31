@@ -7,6 +7,14 @@ use crate::ui::text_view::{TextRenderOutput, TextView, TextViewport};
 
 const BASE_CHROME_ROWS: usize = 1;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BackgroundColor {
+    #[default]
+    DarkGray,
+    LightGray,
+    Black,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum RenderMode<'a> {
     Text {
@@ -88,6 +96,8 @@ impl RenderState {
 pub struct RenderFrame {
     pub lines: Vec<String>,
     pub cursor: Option<(u16, u16)>,
+    pub body_start_row: usize,
+    pub background_color: BackgroundColor,
 }
 
 impl RenderFrame {
@@ -101,6 +111,7 @@ pub struct RenderRequest<'a> {
     pub mode: RenderMode<'a>,
     pub status: StatusLine,
     pub header_message: Option<&'a str>,
+    pub background_color: BackgroundColor,
 }
 
 pub trait TerminalFlush {
@@ -123,7 +134,19 @@ impl<W: Write> TerminalFlush for WriterFlush<W> {
         for (row, line) in frame.lines.iter().enumerate() {
             let row_1_based = row + 1;
             let rendered = line.trim_end_matches(' ');
-            let write = format!("\x1b[{};1H\x1b[2K{}", row_1_based, rendered);
+            let write = if row >= frame.body_start_row {
+                let (bg_sgr, fg_sgr) = match frame.background_color {
+                    BackgroundColor::DarkGray => ("\x1b[48;5;236m", ""),
+                    BackgroundColor::LightGray => ("\x1b[48;5;248m", "\x1b[30m"),
+                    BackgroundColor::Black => ("\x1b[40m\x1b[48;2;0;0;0m", ""),
+                };
+                format!(
+                    "\x1b[{};1H{}{}\x1b[2K{}\x1b[49m\x1b[39m",
+                    row_1_based, bg_sgr, fg_sgr, rendered
+                )
+            } else {
+                format!("\x1b[{};1H\x1b[2K{}", row_1_based, rendered)
+            };
             self.writer.write_all(write.as_bytes())?;
         }
         if let Some((row, col)) = frame.cursor {
@@ -221,6 +244,8 @@ impl Renderer {
                     cursor: text
                         .cursor
                         .map(|(row, col)| ((row + chrome_rows) as u16, col as u16)),
+                    body_start_row: chrome_rows,
+                    background_color: request.background_color,
                 }
             }
 
@@ -236,6 +261,8 @@ impl Renderer {
                 RenderFrame {
                     lines,
                     cursor: None,
+                    body_start_row: chrome_rows,
+                    background_color: request.background_color,
                 }
             }
         }
@@ -405,7 +432,7 @@ fn header_separator_line(width: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{RenderFrame, TerminalFlush, WriterFlush};
+    use super::{BackgroundColor, RenderFrame, TerminalFlush, WriterFlush};
 
     #[test]
     fn writer_flush_does_not_emit_joined_newlines() {
@@ -413,11 +440,51 @@ mod tests {
         let frame = RenderFrame {
             lines: vec!["a".to_string(), "b".to_string()],
             cursor: Some((1, 1)),
+            body_start_row: 1,
+            background_color: BackgroundColor::DarkGray,
         };
         WriterFlush::new(&mut sink)
             .flush(&frame)
             .expect("flush should succeed");
         let rendered = String::from_utf8_lossy(&sink);
         assert!(!rendered.contains("\n\n"));
+    }
+
+    #[test]
+    fn writer_flush_applies_background_only_to_body_rows() {
+        let mut sink = Vec::<u8>::new();
+        let frame = RenderFrame {
+            lines: vec![
+                "header".to_string(),
+                "status".to_string(),
+                "body".to_string(),
+            ],
+            cursor: None,
+            body_start_row: 2,
+            background_color: BackgroundColor::DarkGray,
+        };
+        WriterFlush::new(&mut sink)
+            .flush(&frame)
+            .expect("flush should succeed");
+        let rendered = String::from_utf8_lossy(&sink);
+        assert!(rendered.contains("\x1b[3;1H\x1b[48;5;236m\x1b[2Kbody\x1b[49m"));
+        assert!(!rendered.contains("\x1b[1;1H\x1b[48;5;236m"));
+        assert!(!rendered.contains("\x1b[2;1H\x1b[48;5;236m"));
+    }
+
+    #[test]
+    fn writer_flush_uses_black_text_on_light_gray_background() {
+        let mut sink = Vec::<u8>::new();
+        let frame = RenderFrame {
+            lines: vec!["header".to_string(), "body".to_string()],
+            cursor: None,
+            body_start_row: 1,
+            background_color: BackgroundColor::LightGray,
+        };
+        WriterFlush::new(&mut sink)
+            .flush(&frame)
+            .expect("flush should succeed");
+        let rendered = String::from_utf8_lossy(&sink);
+        assert!(rendered.contains("\x1b[2;1H\x1b[48;5;248m\x1b[30m\x1b[2Kbody\x1b[49m\x1b[39m"));
     }
 }

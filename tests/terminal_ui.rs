@@ -1,6 +1,6 @@
 use ebba::document::Document;
 use ebba::ui::hex_view::{HexView, HexViewport, format_hex_row};
-use ebba::ui::renderer::{RenderMode, RenderRequest, RenderState, Renderer};
+use ebba::ui::renderer::{BackgroundColor, RenderMode, RenderRequest, RenderState, Renderer};
 use ebba::ui::status::StatusLine;
 use ebba::ui::text_view::{TextView, TextViewport};
 
@@ -26,6 +26,7 @@ fn status_line_is_rendered_on_top_row() {
             },
             status,
             header_message: None,
+            background_color: BackgroundColor::DarkGray,
         },
     );
 
@@ -133,6 +134,7 @@ fn renderer_keeps_status_line_when_body_height_is_zero() {
                 ..StatusLine::default()
             },
             header_message: None,
+            background_color: BackgroundColor::DarkGray,
         },
     );
 
@@ -207,6 +209,7 @@ fn renderer_places_cursor_on_first_text_row_not_status_row() {
             },
             status: StatusLine::default(),
             header_message: None,
+            background_color: BackgroundColor::DarkGray,
         },
     );
 
@@ -233,6 +236,7 @@ fn renderer_places_transient_header_above_status() {
                 ..StatusLine::default()
             },
             header_message: Some("Ctrl+Q quit"),
+            background_color: BackgroundColor::DarkGray,
         },
     );
 
@@ -259,6 +263,7 @@ fn renderer_wraps_transient_header_by_width() {
             },
             status: StatusLine::default(),
             header_message: Some("1234567890AB"),
+            background_color: BackgroundColor::DarkGray,
         },
     );
 
@@ -317,6 +322,7 @@ fn wrapped_status_shows_logical_line_and_wrap_segment() {
             },
             status: StatusLine::default(),
             header_message: None,
+            background_color: BackgroundColor::DarkGray,
         },
     );
 
@@ -347,6 +353,7 @@ fn centered_wrap_shifts_text_but_not_status_or_header_width() {
                 ..StatusLine::default()
             },
             header_message: Some("header"),
+            background_color: BackgroundColor::DarkGray,
         },
     );
 
@@ -375,7 +382,7 @@ fn selection_is_visually_highlighted() {
         },
     );
 
-    assert!(rendered.lines[0].contains("\x1b[7mhe\x1b[0m"));
+    assert!(rendered.lines[0].contains("\x1b[7mhe\x1b[27m"));
     assert!(!rendered.lines[0].contains("\x1b[7mhello world"));
 }
 
@@ -398,5 +405,5 @@ fn selecting_line_break_shows_inverted_block() {
         },
     );
 
-    assert!(rendered.lines[0].contains("\x1b[7m \x1b[0m"));
+    assert!(rendered.lines[0].contains("\x1b[7m \x1b[27m"));
 }

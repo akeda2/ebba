@@ -76,6 +76,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 item("Quit", "q/⌘Q/Ctrl+Q/F10", 1),
                 item("Force quit", "Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12", 1),
                 item("Help", "⇧⌘?/Ctrl+H/F1/F9", 1),
+                item("Background", "Ctrl+R", 2),
                 item("Scroll", "↑/↓/PgUp/PgDn/Home/End", 2),
             ],
             KeybindingProfile::Linux => vec![
@@ -86,18 +87,21 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                     1,
                 ),
                 item("Help", "Ctrl+H/Alt+H/F1/F9", 1),
+                item("Background", "Ctrl+R/Alt+R", 2),
                 item("Scroll", "↑/↓/PgUp/PgDn/Home/End", 2),
             ],
             KeybindingProfile::LinuxConsole => vec![
                 item("Quit", "q/Ctrl+Q/F10", 1),
                 item("Force quit", "Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12", 1),
                 item("Help", "Ctrl+H/Alt+H/F1/F9", 1),
+                item("Background", "Ctrl+R/Alt+R", 2),
                 item("Scroll", "↑/↓/PgUp/PgDn/Home/End", 2),
             ],
             KeybindingProfile::Windows => vec![
                 item("Quit", "q/Ctrl+Q/F10", 1),
                 item("Force quit", "Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12", 1),
                 item("Help", "Ctrl+H/F1/F9", 1),
+                item("Background", "Ctrl+R/Alt+R", 2),
                 item("Scroll", "↑/↓/PgUp/PgDn/Home/End", 2),
             ],
         },
@@ -114,6 +118,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 item("Redo", "⇧⌘Z/Ctrl+Y", 2),
                 item("Toggle BOM", "Ctrl+B/F8", 3),
                 item("Tab width", "Ctrl+T/F5", 3),
+                item("Background", "Ctrl+R", 3),
                 item("Hard tabs", "Ctrl+Shift+T/Ctrl+Alt+T/Ctrl+Shift+H/F4", 3),
                 item("Toggle wrap", "Ctrl+W/F7", 3),
                 item("Toggle invisibles", "Ctrl+K/Ctrl+./Alt+K/F6", 3),
@@ -140,6 +145,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 item("Redo", "Ctrl+Y/Ctrl+Shift+Z", 2),
                 item("Toggle BOM", "Ctrl+B/Alt+B/Ctrl+Shift+B/F8", 3),
                 item("Tab width", "Ctrl+T/F5", 3),
+                item("Background", "Ctrl+R/Alt+R", 3),
                 item(
                     "Hard tabs",
                     "Ctrl+Shift+T/Ctrl+Alt+T/Alt+Shift+T/Ctrl+Shift+H/F4",
@@ -162,6 +168,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 item("Redo", "Ctrl+Y/Ctrl+Shift+Z", 2),
                 item("Toggle BOM", "Ctrl+B/F8", 3),
                 item("Tab width", "Ctrl+T/F5", 3),
+                item("Background", "Ctrl+R/Alt+R", 3),
                 item(
                     "Hard tabs",
                     "Ctrl+Shift+T/Ctrl+Alt+T/Alt+Shift+T/Ctrl+Shift+H/F4",
@@ -184,6 +191,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 item("Redo", "Ctrl+Y/Ctrl+Shift+Z", 2),
                 item("Toggle BOM", "Ctrl+B/F8", 3),
                 item("Tab width", "Ctrl+T/F5", 3),
+                item("Background", "Ctrl+R/Alt+R", 3),
                 item(
                     "Hard tabs",
                     "Ctrl+Shift+T/Ctrl+Alt+T/Alt+Shift+T/Ctrl+Shift+H/F4",
