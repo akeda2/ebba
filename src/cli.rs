@@ -29,6 +29,7 @@ pub enum KeymapMode {
 pub enum BackgroundMode {
     DarkGray,
     LightGray,
+    Blue,
     Black,
 }
 
@@ -91,7 +92,7 @@ pub struct Cli {
     #[arg(
         long,
         value_enum,
-        help = "Set editor background color (dark-gray, light-gray, or black)"
+        help = "Set editor background color (dark-gray, light-gray, blue, or black)"
     )]
     pub background: Option<BackgroundMode>,
     #[arg(
@@ -199,6 +200,7 @@ impl Cli {
         match self.background.unwrap_or(BackgroundMode::DarkGray) {
             BackgroundMode::DarkGray => BackgroundColor::DarkGray,
             BackgroundMode::LightGray => BackgroundColor::LightGray,
+            BackgroundMode::Blue => BackgroundColor::Blue,
             BackgroundMode::Black => BackgroundColor::Black,
         }
     }
@@ -431,5 +433,13 @@ mod tests {
             .expect("light-gray background should parse");
         assert_eq!(cli.background, Some(BackgroundMode::LightGray));
         assert_eq!(cli.background_color(), BackgroundColor::LightGray);
+    }
+
+    #[test]
+    fn parses_blue_background() {
+        let cli = Cli::try_parse_from(["ebba", "README.md", "--background", "blue"])
+            .expect("blue background should parse");
+        assert_eq!(cli.background, Some(BackgroundMode::Blue));
+        assert_eq!(cli.background_color(), BackgroundColor::Blue);
     }
 }

@@ -12,6 +12,7 @@ pub enum BackgroundColor {
     #[default]
     DarkGray,
     LightGray,
+    Blue,
     Black,
 }
 
@@ -138,6 +139,7 @@ impl<W: Write> TerminalFlush for WriterFlush<W> {
                 let (bg_sgr, fg_sgr) = match frame.background_color {
                     BackgroundColor::DarkGray => ("\x1b[48;5;236m", ""),
                     BackgroundColor::LightGray => ("\x1b[48;5;248m", "\x1b[30m"),
+                    BackgroundColor::Blue => ("\x1b[48;5;18m", "\x1b[97m"),
                     BackgroundColor::Black => ("\x1b[40m\x1b[48;2;0;0;0m", ""),
                 };
                 format!(
@@ -486,5 +488,21 @@ mod tests {
             .expect("flush should succeed");
         let rendered = String::from_utf8_lossy(&sink);
         assert!(rendered.contains("\x1b[2;1H\x1b[48;5;248m\x1b[30m\x1b[2Kbody\x1b[49m\x1b[39m"));
+    }
+
+    #[test]
+    fn writer_flush_uses_white_text_on_blue_background() {
+        let mut sink = Vec::<u8>::new();
+        let frame = RenderFrame {
+            lines: vec!["header".to_string(), "body".to_string()],
+            cursor: None,
+            body_start_row: 1,
+            background_color: BackgroundColor::Blue,
+        };
+        WriterFlush::new(&mut sink)
+            .flush(&frame)
+            .expect("flush should succeed");
+        let rendered = String::from_utf8_lossy(&sink);
+        assert!(rendered.contains("\x1b[2;1H\x1b[48;5;18m\x1b[97m\x1b[2Kbody\x1b[49m\x1b[39m"));
     }
 }
