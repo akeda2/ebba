@@ -366,9 +366,7 @@ impl AppState {
             Command::Copy => {
                 let mut used_line_fallback = false;
                 let fallback_caret = self.document.selection().active.byte_offset;
-                if self.keybinding_profile == KeybindingProfile::LinuxConsole
-                    && self.document.selection().is_caret()
-                {
+                if self.document.selection().is_caret() {
                     used_line_fallback = self
                         .document
                         .select_current_line(false)
@@ -387,9 +385,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
-                if self.keybinding_profile == KeybindingProfile::LinuxConsole
-                    && self.document.selection().is_caret()
-                {
+                if self.document.selection().is_caret() {
                     let _ = self
                         .document
                         .select_current_line(true)
@@ -1567,11 +1563,10 @@ mod tests {
     }
 
     #[test]
-    fn linux_console_copy_falls_back_to_current_line_without_sticky_selection() {
+    fn copy_falls_back_to_current_line_without_sticky_selection() {
         let mut document = Document::from_bytes(b"ab\ncd\nef".to_vec());
         document.move_to_byte_offset(4, false);
         let mut app = AppState::new(document);
-        app.set_keybinding_profile(crate::input::KeybindingProfile::LinuxConsole);
 
         app.execute_command(Command::Copy)
             .expect("copy should succeed");
@@ -1582,11 +1577,10 @@ mod tests {
     }
 
     #[test]
-    fn linux_console_cut_falls_back_to_current_line() {
+    fn cut_falls_back_to_current_line() {
         let mut document = Document::from_bytes(b"ab\ncd\nef".to_vec());
         document.move_to_byte_offset(4, false);
         let mut app = AppState::new(document);
-        app.set_keybinding_profile(crate::input::KeybindingProfile::LinuxConsole);
 
         app.execute_command(Command::Cut)
             .expect("cut should succeed");
