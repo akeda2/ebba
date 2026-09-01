@@ -33,6 +33,87 @@ pub enum CommandDisposition {
     Exit,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LineFallbackAction {
+    Copy,
+    Cut,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct ClipboardGuards {
+    line_fallback_block_next: Option<LineFallbackAction>,
+    copy_blocked_once_after_cut: bool,
+    cut_blocked_once_after_cut: bool,
+}
+
+impl ClipboardGuards {
+    fn reset_line_fallback(&mut self) {
+        self.line_fallback_block_next = None;
+    }
+
+    fn before_copy(&mut self, caret_only: bool) -> Result<(), AppError> {
+        if self.copy_blocked_once_after_cut {
+            self.copy_blocked_once_after_cut = false;
+            return Err(AppError::Message(
+                "paste or press copy again to overwrite the last cut".to_string(),
+            ));
+        }
+        if caret_only && self.line_fallback_block_next == Some(LineFallbackAction::Copy) {
+            self.line_fallback_block_next = None;
+            return Err(AppError::Message(
+                "press copy again to confirm current-line copy".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn after_copy(&mut self, used_line_fallback: bool) {
+        self.copy_blocked_once_after_cut = false;
+        if used_line_fallback {
+            self.line_fallback_block_next = Some(LineFallbackAction::Copy);
+        } else {
+            self.reset_line_fallback();
+        }
+    }
+
+    fn before_cut(&mut self, caret_only: bool) -> Result<(), AppError> {
+        if self.cut_blocked_once_after_cut {
+            self.cut_blocked_once_after_cut = false;
+            if self.line_fallback_block_next == Some(LineFallbackAction::Cut) {
+                self.line_fallback_block_next = None;
+            }
+            return Err(AppError::Message(
+                "paste or press cut again to overwrite the last cut".to_string(),
+            ));
+        }
+        if caret_only && self.line_fallback_block_next == Some(LineFallbackAction::Cut) {
+            self.line_fallback_block_next = None;
+            return Err(AppError::Message(
+                "press cut again to confirm current-line cut".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn after_cut(&mut self, used_line_fallback: bool, cut_performed: bool) {
+        if used_line_fallback {
+            self.line_fallback_block_next = Some(LineFallbackAction::Cut);
+        } else {
+            self.reset_line_fallback();
+        }
+        if cut_performed {
+            self.copy_blocked_once_after_cut = true;
+            self.cut_blocked_once_after_cut = true;
+        }
+    }
+
+    fn on_paste(&mut self) {
+        self.reset_line_fallback();
+        self.copy_blocked_once_after_cut = false;
+        self.cut_blocked_once_after_cut = false;
+    }
+}
+
 #[derive(Debug)]
 pub struct AppState {
     document: Document,
@@ -53,6 +134,7 @@ pub struct AppState {
     background_color: BackgroundColor,
     selection_mode: bool,
     keybinding_profile: KeybindingProfile,
+    clipboard_guards: ClipboardGuards,
 }
 
 impl AppState {
@@ -82,6 +164,7 @@ impl AppState {
             background_color: BackgroundColor::DarkGray,
             selection_mode: false,
             keybinding_profile: KeybindingProfile::current(),
+            clipboard_guards: ClipboardGuards::default(),
         }
     }
 
@@ -232,6 +315,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.clipboard_guards.reset_line_fallback();
                 if ch == '\t' && !self.document.selection().is_caret() {
                     self.document
                         .indent_selection_lines_with_mode(self.tab_width, self.hard_tabs)
@@ -313,6 +397,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.clipboard_guards.reset_line_fallback();
                 self.document
                     .outdent_selection_lines_with_mode(self.tab_width, self.hard_tabs)
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -322,6 +407,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.clipboard_guards.reset_line_fallback();
                 self.document
                     .insert_text("\n")
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -331,6 +417,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.clipboard_guards.reset_line_fallback();
                 self.document
                     .delete_backward()
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -340,6 +427,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.clipboard_guards.reset_line_fallback();
                 self.document
                     .delete_forward()
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -349,6 +437,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.clipboard_guards.reset_line_fallback();
                 self.document
                     .delete_word_backward()
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -358,17 +447,18 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.clipboard_guards.reset_line_fallback();
                 self.document
                     .delete_to_line_start()
                     .map_err(|error| AppError::Message(error.to_string()))?;
                 Ok(CommandDisposition::Continue)
             }
             Command::Copy => {
+                let caret_only = self.document.selection().is_caret();
+                self.clipboard_guards.before_copy(caret_only)?;
                 let mut used_line_fallback = false;
                 let fallback_caret = self.document.selection().active.byte_offset;
-                if self.keybinding_profile == KeybindingProfile::LinuxConsole
-                    && self.document.selection().is_caret()
-                {
+                if caret_only {
                     used_line_fallback = self
                         .document
                         .select_current_line(false)
@@ -377,6 +467,7 @@ impl AppState {
                 self.document
                     .copy_selection()
                     .map_err(|error| AppError::Message(error.to_string()))?;
+                self.clipboard_guards.after_copy(used_line_fallback);
                 self.selection_mode = false;
                 if used_line_fallback {
                     self.document.move_to_byte_offset(fallback_caret, false);
@@ -387,17 +478,22 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
-                if self.keybinding_profile == KeybindingProfile::LinuxConsole
-                    && self.document.selection().is_caret()
-                {
+                let caret_only = self.document.selection().is_caret();
+                self.clipboard_guards.before_cut(caret_only)?;
+                let mut used_line_fallback = false;
+                if caret_only {
                     let _ = self
                         .document
                         .select_current_line(true)
                         .map_err(|error| AppError::Message(error.to_string()))?;
+                    used_line_fallback = true;
                 }
-                self.document
+                let cut_performed = self
+                    .document
                     .cut_selection()
                     .map_err(|error| AppError::Message(error.to_string()))?;
+                self.clipboard_guards
+                    .after_cut(used_line_fallback, cut_performed);
                 Ok(CommandDisposition::Continue)
             }
             Command::Paste => {
@@ -407,18 +503,21 @@ impl AppState {
                 self.document
                     .paste_clipboard()
                     .map_err(|error| AppError::Message(error.to_string()))?;
+                self.clipboard_guards.on_paste();
                 Ok(CommandDisposition::Continue)
             }
             Command::PasteText(text) => {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.clipboard_guards.reset_line_fallback();
                 self.document
                     .insert_text(&text)
                     .map_err(|error| AppError::Message(error.to_string()))?;
                 Ok(CommandDisposition::Continue)
             }
             Command::SelectAll => {
+                self.clipboard_guards.reset_line_fallback();
                 self.document.select_all();
                 Ok(CommandDisposition::Continue)
             }
@@ -441,6 +540,7 @@ impl AppState {
                 Ok(CommandDisposition::Continue)
             }
             Command::Move { direction, extend } => {
+                self.clipboard_guards.reset_line_fallback();
                 let extend = extend || self.selection_mode;
                 if self.wrap_enabled
                     && matches!(
@@ -1567,11 +1667,10 @@ mod tests {
     }
 
     #[test]
-    fn linux_console_copy_falls_back_to_current_line_without_sticky_selection() {
+    fn copy_falls_back_to_current_line_without_sticky_selection() {
         let mut document = Document::from_bytes(b"ab\ncd\nef".to_vec());
         document.move_to_byte_offset(4, false);
         let mut app = AppState::new(document);
-        app.set_keybinding_profile(crate::input::KeybindingProfile::LinuxConsole);
 
         app.execute_command(Command::Copy)
             .expect("copy should succeed");
@@ -1582,11 +1681,10 @@ mod tests {
     }
 
     #[test]
-    fn linux_console_cut_falls_back_to_current_line() {
+    fn cut_falls_back_to_current_line() {
         let mut document = Document::from_bytes(b"ab\ncd\nef".to_vec());
         document.move_to_byte_offset(4, false);
         let mut app = AppState::new(document);
-        app.set_keybinding_profile(crate::input::KeybindingProfile::LinuxConsole);
 
         app.execute_command(Command::Cut)
             .expect("cut should succeed");
@@ -1596,6 +1694,91 @@ mod tests {
             app.document().bytes().expect("bytes should be readable"),
             b"ab\nef"
         );
+    }
+
+    #[test]
+    fn repeated_current_line_copy_requires_second_press_to_confirm() {
+        let mut document = Document::from_bytes(b"ab\ncd\nef".to_vec());
+        document.move_to_byte_offset(4, false);
+        let mut app = AppState::new(document);
+
+        app.execute_command(Command::Copy)
+            .expect("first copy should succeed");
+        let second = app.execute_command(Command::Copy);
+        assert!(second.is_err());
+        app.execute_command(Command::Copy)
+            .expect("third copy should succeed after confirmation press");
+    }
+
+    #[test]
+    fn repeated_current_line_cut_requires_second_press_to_confirm() {
+        let mut document = Document::from_bytes(b"ab\ncd\nef\n".to_vec());
+        document.move_to_byte_offset(4, false);
+        let mut app = AppState::new(document);
+
+        app.execute_command(Command::Cut)
+            .expect("first cut should succeed");
+        let second = app.execute_command(Command::Cut);
+        assert!(second.is_err());
+        app.execute_command(Command::Cut)
+            .expect("third cut should succeed after confirmation press");
+    }
+
+    #[test]
+    fn line_fallback_copy_guard_resets_after_paste() {
+        let mut document = Document::from_bytes(b"ab\ncd\nef".to_vec());
+        document.move_to_byte_offset(4, false);
+        let mut app = AppState::new(document);
+
+        app.execute_command(Command::Copy)
+            .expect("first copy should succeed");
+        assert!(app.execute_command(Command::Copy).is_err());
+        app.execute_command(Command::Paste)
+            .expect("paste should succeed and reset guard");
+        app.execute_command(Command::Copy)
+            .expect("copy should succeed again immediately after paste");
+    }
+
+    #[test]
+    fn first_copy_after_cut_is_blocked_to_protect_clipboard() {
+        let mut document = Document::from_bytes(b"aa\nbb\ncc\ndd".to_vec());
+        document.move_to_byte_offset(4, false);
+        let mut app = AppState::new(document);
+
+        app.execute_command(Command::Cut)
+            .expect("cut should succeed");
+        app.execute_command(Command::Move {
+            direction: MoveCommand::Down,
+            extend: false,
+        })
+        .expect("move should succeed");
+        assert!(app.execute_command(Command::Copy).is_err());
+        assert_eq!(app.document().clipboard(), "bb\n");
+
+        app.execute_command(Command::Move {
+            direction: MoveCommand::DocumentEnd,
+            extend: false,
+        })
+        .expect("move should succeed");
+        app.execute_command(Command::Paste)
+            .expect("paste should use protected cut clipboard");
+        assert_eq!(
+            app.document().bytes().expect("bytes should be readable"),
+            b"aa\ncc\nddbb\n"
+        );
+    }
+
+    #[test]
+    fn first_cut_after_selected_cut_is_blocked_to_protect_clipboard() {
+        let mut document = Document::from_bytes(b"aa\nbb\ncc\ndd".to_vec());
+        document.select_all();
+        let mut app = AppState::new(document);
+
+        app.execute_command(Command::Cut)
+            .expect("selected cut should succeed");
+        assert!(app.execute_command(Command::Cut).is_err());
+        app.execute_command(Command::Cut)
+            .expect("second cut press should be allowed");
     }
 
     #[test]
