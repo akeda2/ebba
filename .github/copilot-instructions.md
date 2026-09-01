@@ -20,6 +20,23 @@ cargo test --quiet tab_with_selection_indents_lines_instead_of_replacing_selecti
 
 `ebba` currently has no separate lint command configured (no clippy target wired in project docs/scripts). Use `cargo check --quiet` plus targeted/full tests.
 
+## Non-interactive render mode for testing
+
+Use `--render-once` to render exactly one frame and exit, which is the preferred path for deterministic UI checks in automation and AI-agent workflows.
+
+```bash
+# Render one frame at fixed viewport size
+cargo run --quiet -- test.md --render-once --render-width 100 --render-height 18
+
+# Include startup help in the rendered frame
+cargo run --quiet -- test.md --render-once --render-help --render-width 100 --render-height 18
+```
+
+Useful paired flags for targeted assertions:
+- `--tab-width {2|4|8}`
+- `--invisibles`
+- `--background {dark-gray|light-gray|black|blue}`
+
 ## High-level architecture
 
 - **Entry/runtime loop**: `src/main.rs` calls `app::run()` in `src/app.rs`.  
