@@ -113,7 +113,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 item("Force quit", "Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12", 1),
                 item(
                     "Clipboard",
-                    "⌘C/X/V, Ctrl+C/X/V, Ctrl+Shift+C/V (line fallback on caret)",
+                    "⌘C/X/V, Ctrl+C/X/V, Ctrl+Shift+C/V (line fallback on caret, repeat with double-press)",
                     2,
                 ),
                 item("Select", "⌘A, Shift+Arrows/PgUp/PgDn, Shift+⌥←→/⌘←→/⌘↑↓", 2),
@@ -144,7 +144,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 ),
                 item(
                     "Clipboard",
-                    "Ctrl+C/X/V, Ctrl+Shift+C/V (terminal, line fallback on caret)",
+                    "Ctrl+C/X/V, Ctrl+Shift+C/V (terminal, line fallback on caret, repeat with double-press)",
                     2,
                 ),
                 item("Select", "Ctrl+A, Shift+Arrows/PgUp/PgDn", 2),
@@ -169,7 +169,11 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 item("Help", "Ctrl+H/Alt+H/F1/F9", 1),
                 item("Quit", "Ctrl+Q/F10", 1),
                 item("Force quit", "Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12", 1),
-                item("Clipboard", "Ctrl+C/X/V/Ctrl+A (line fallback on caret)", 2),
+                item(
+                    "Clipboard",
+                    "Ctrl+C/X/V/Ctrl+A (line fallback on caret, repeat with double-press)",
+                    2,
+                ),
                 item("Select", "Ctrl+A, Shift+Arrows/PgUp/PgDn", 2),
                 item("Select-mode", "F3/Ctrl+Space/Alt+S", 2),
                 item("Undo", "Ctrl+Z", 2),
@@ -194,7 +198,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 item("Force quit", "Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12", 1),
                 item(
                     "Clipboard",
-                    "Ctrl+C/X/V, Ctrl+Shift+C/V (line fallback on caret)",
+                    "Ctrl+C/X/V, Ctrl+Shift+C/V (line fallback on caret, repeat with double-press)",
                     2,
                 ),
                 item("Select", "Ctrl+A, Shift+Arrows/PgUp/PgDn", 2),

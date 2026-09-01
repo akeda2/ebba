@@ -33,6 +33,12 @@ pub enum CommandDisposition {
     Exit,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LineFallbackAction {
+    Copy,
+    Cut,
+}
+
 #[derive(Debug)]
 pub struct AppState {
     document: Document,
@@ -53,6 +59,8 @@ pub struct AppState {
     background_color: BackgroundColor,
     selection_mode: bool,
     keybinding_profile: KeybindingProfile,
+    block_next_line_fallback_copy: bool,
+    block_next_line_fallback_cut: bool,
 }
 
 impl AppState {
@@ -82,6 +90,8 @@ impl AppState {
             background_color: BackgroundColor::DarkGray,
             selection_mode: false,
             keybinding_profile: KeybindingProfile::current(),
+            block_next_line_fallback_copy: false,
+            block_next_line_fallback_cut: false,
         }
     }
 
@@ -201,6 +211,34 @@ impl AppState {
         self.document.is_dirty() || self.format_dirty
     }
 
+    fn reset_line_fallback_guards(&mut self) {
+        self.block_next_line_fallback_copy = false;
+        self.block_next_line_fallback_cut = false;
+    }
+
+    fn should_block_line_fallback(&mut self, action: LineFallbackAction) -> bool {
+        match action {
+            LineFallbackAction::Copy => {
+                if self.block_next_line_fallback_copy {
+                    self.block_next_line_fallback_copy = false;
+                    true
+                } else {
+                    self.block_next_line_fallback_copy = true;
+                    false
+                }
+            }
+            LineFallbackAction::Cut => {
+                if self.block_next_line_fallback_cut {
+                    self.block_next_line_fallback_cut = false;
+                    true
+                } else {
+                    self.block_next_line_fallback_cut = true;
+                    false
+                }
+            }
+        }
+    }
+
     pub fn execute_command(&mut self, command: Command) -> AppResult<CommandDisposition> {
         match command {
             Command::Quit => {
@@ -232,6 +270,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.reset_line_fallback_guards();
                 if ch == '\t' && !self.document.selection().is_caret() {
                     self.document
                         .indent_selection_lines_with_mode(self.tab_width, self.hard_tabs)
@@ -313,6 +352,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.reset_line_fallback_guards();
                 self.document
                     .outdent_selection_lines_with_mode(self.tab_width, self.hard_tabs)
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -322,6 +362,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.reset_line_fallback_guards();
                 self.document
                     .insert_text("\n")
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -331,6 +372,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.reset_line_fallback_guards();
                 self.document
                     .delete_backward()
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -340,6 +382,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.reset_line_fallback_guards();
                 self.document
                     .delete_forward()
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -349,6 +392,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.reset_line_fallback_guards();
                 self.document
                     .delete_word_backward()
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -358,6 +402,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.reset_line_fallback_guards();
                 self.document
                     .delete_to_line_start()
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -367,10 +412,17 @@ impl AppState {
                 let mut used_line_fallback = false;
                 let fallback_caret = self.document.selection().active.byte_offset;
                 if self.document.selection().is_caret() {
+                    if self.should_block_line_fallback(LineFallbackAction::Copy) {
+                        return Err(AppError::Message(
+                            "press copy again to confirm current-line copy".to_string(),
+                        ));
+                    }
                     used_line_fallback = self
                         .document
                         .select_current_line(false)
                         .map_err(|error| AppError::Message(error.to_string()))?;
+                } else {
+                    self.reset_line_fallback_guards();
                 }
                 self.document
                     .copy_selection()
@@ -386,10 +438,17 @@ impl AppState {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
                 if self.document.selection().is_caret() {
+                    if self.should_block_line_fallback(LineFallbackAction::Cut) {
+                        return Err(AppError::Message(
+                            "press cut again to confirm current-line cut".to_string(),
+                        ));
+                    }
                     let _ = self
                         .document
                         .select_current_line(true)
                         .map_err(|error| AppError::Message(error.to_string()))?;
+                } else {
+                    self.reset_line_fallback_guards();
                 }
                 self.document
                     .cut_selection()
@@ -400,6 +459,7 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.reset_line_fallback_guards();
                 self.document
                     .paste_clipboard()
                     .map_err(|error| AppError::Message(error.to_string()))?;
@@ -409,12 +469,14 @@ impl AppState {
                 if self.read_only {
                     return Err(AppError::Message("buffer is read-only".to_string()));
                 }
+                self.reset_line_fallback_guards();
                 self.document
                     .insert_text(&text)
                     .map_err(|error| AppError::Message(error.to_string()))?;
                 Ok(CommandDisposition::Continue)
             }
             Command::SelectAll => {
+                self.reset_line_fallback_guards();
                 self.document.select_all();
                 Ok(CommandDisposition::Continue)
             }
@@ -437,6 +499,7 @@ impl AppState {
                 Ok(CommandDisposition::Continue)
             }
             Command::Move { direction, extend } => {
+                self.reset_line_fallback_guards();
                 let extend = extend || self.selection_mode;
                 if self.wrap_enabled
                     && matches!(
@@ -1590,6 +1653,49 @@ mod tests {
             app.document().bytes().expect("bytes should be readable"),
             b"ab\nef"
         );
+    }
+
+    #[test]
+    fn repeated_current_line_copy_requires_second_press_to_confirm() {
+        let mut document = Document::from_bytes(b"ab\ncd\nef".to_vec());
+        document.move_to_byte_offset(4, false);
+        let mut app = AppState::new(document);
+
+        app.execute_command(Command::Copy)
+            .expect("first copy should succeed");
+        let second = app.execute_command(Command::Copy);
+        assert!(second.is_err());
+        app.execute_command(Command::Copy)
+            .expect("third copy should succeed after confirmation press");
+    }
+
+    #[test]
+    fn repeated_current_line_cut_requires_second_press_to_confirm() {
+        let mut document = Document::from_bytes(b"ab\ncd\nef\n".to_vec());
+        document.move_to_byte_offset(4, false);
+        let mut app = AppState::new(document);
+
+        app.execute_command(Command::Cut)
+            .expect("first cut should succeed");
+        let second = app.execute_command(Command::Cut);
+        assert!(second.is_err());
+        app.execute_command(Command::Cut)
+            .expect("third cut should succeed after confirmation press");
+    }
+
+    #[test]
+    fn line_fallback_copy_guard_resets_after_paste() {
+        let mut document = Document::from_bytes(b"ab\ncd\nef".to_vec());
+        document.move_to_byte_offset(4, false);
+        let mut app = AppState::new(document);
+
+        app.execute_command(Command::Copy)
+            .expect("first copy should succeed");
+        assert!(app.execute_command(Command::Copy).is_err());
+        app.execute_command(Command::Paste)
+            .expect("paste should succeed and reset guard");
+        app.execute_command(Command::Copy)
+            .expect("copy should succeed again immediately after paste");
     }
 
     #[test]
