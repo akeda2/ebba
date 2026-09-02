@@ -292,7 +292,8 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
         selection_spans.push(None);
         let background_start = gutter_width + 1 + center_padding;
         let background_width = text_width.min(viewport.width.saturating_sub(background_start));
-        background_spans.push((background_width > 0).then_some((background_start, background_width)));
+        background_spans
+            .push((background_width > 0).then_some((background_start, background_width)));
 
         if visual_row == cursor_visual_row {
             cursor = Some((row, cursor_col));

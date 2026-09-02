@@ -137,11 +137,7 @@ impl<W: Write> TerminalFlush for WriterFlush<W> {
             let row_1_based = row + 1;
             let body_row = row.saturating_sub(frame.body_start_row);
             let bg_span = if row >= frame.body_start_row {
-                frame
-                    .body_background_spans
-                    .get(body_row)
-                    .copied()
-                    .flatten()
+                frame.body_background_spans.get(body_row).copied().flatten()
             } else {
                 None
             };
