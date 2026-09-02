@@ -99,6 +99,7 @@ pub struct RenderFrame {
     pub cursor: Option<(u16, u16)>,
     pub body_start_row: usize,
     pub background_color: BackgroundColor,
+    pub body_background_spans: Vec<Option<(usize, usize)>>,
 }
 
 impl RenderFrame {
@@ -134,7 +135,21 @@ impl<W: Write> TerminalFlush for WriterFlush<W> {
         self.writer.write_all(b"\x1b[?25l\x1b[H")?;
         for (row, line) in frame.lines.iter().enumerate() {
             let row_1_based = row + 1;
-            let rendered = line.trim_end_matches(' ');
+            let body_row = row.saturating_sub(frame.body_start_row);
+            let bg_span = if row >= frame.body_start_row {
+                frame
+                    .body_background_spans
+                    .get(body_row)
+                    .copied()
+                    .flatten()
+            } else {
+                None
+            };
+            let rendered = if bg_span.is_some() {
+                line.as_str()
+            } else {
+                line.trim_end_matches(' ')
+            };
             let write = if row >= frame.body_start_row {
                 let (bg_sgr, fg_sgr) = match frame.background_color {
                     BackgroundColor::DarkGray => ("\x1b[48;5;235m", ""),
@@ -142,10 +157,16 @@ impl<W: Write> TerminalFlush for WriterFlush<W> {
                     BackgroundColor::Blue => ("\x1b[48;5;18m", "\x1b[97m"),
                     BackgroundColor::Black => ("\x1b[40m\x1b[48;2;0;0;0m", ""),
                 };
-                format!(
-                    "\x1b[{};1H{}{}\x1b[2K{}\x1b[49m\x1b[39m",
-                    row_1_based, bg_sgr, fg_sgr, rendered
-                )
+                if let Some((start_col, width)) = bg_span {
+                    let (prefix, middle, suffix) =
+                        split_by_display_columns_with_ansi(rendered, start_col, width);
+                    format!(
+                        "\x1b[{};1H\x1b[2K{}{}{}{}\x1b[49m\x1b[39m{}",
+                        row_1_based, prefix, bg_sgr, fg_sgr, middle, suffix
+                    )
+                } else {
+                    format!("\x1b[{};1H\x1b[2K{}", row_1_based, rendered)
+                }
             } else {
                 format!("\x1b[{};1H\x1b[2K{}", row_1_based, rendered)
             };
@@ -248,6 +269,7 @@ impl Renderer {
                         .map(|(row, col)| ((row + chrome_rows) as u16, col as u16)),
                     body_start_row: chrome_rows,
                     background_color: request.background_color,
+                    body_background_spans: text.background_spans,
                 }
             }
 
@@ -265,6 +287,7 @@ impl Renderer {
                     cursor: None,
                     body_start_row: chrome_rows,
                     background_color: request.background_color,
+                    body_background_spans: vec![Some((0, body_width)); hex.lines.len()],
                 }
             }
         }
@@ -432,6 +455,76 @@ fn header_separator_line(width: usize) -> String {
     "-".repeat(width - HEADER_SEPARATOR_RIGHT_MARGIN)
 }
 
+fn split_by_display_columns_with_ansi(
+    input: &str,
+    start_col: usize,
+    width: usize,
+) -> (String, String, String) {
+    if width == 0 {
+        return (input.to_string(), String::new(), String::new());
+    }
+    let end_col = start_col.saturating_add(width);
+    let mut prefix = String::new();
+    let mut middle = String::new();
+    let mut suffix = String::new();
+    let mut col = 0usize;
+    let mut idx = 0usize;
+    let bytes = input.as_bytes();
+
+    while idx < input.len() {
+        if bytes[idx] == 0x1b {
+            let seq_end = parse_ansi_escape_end(bytes, idx).unwrap_or(input.len());
+            let seq = &input[idx..seq_end];
+            if col < start_col {
+                prefix.push_str(seq);
+            } else if col < end_col {
+                middle.push_str(seq);
+            } else {
+                suffix.push_str(seq);
+            }
+            idx = seq_end;
+            continue;
+        }
+
+        let mut chars = input[idx..].chars();
+        let Some(ch) = chars.next() else {
+            break;
+        };
+        let ch_len = ch.len_utf8();
+        let ch_width = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        let target = if col < start_col {
+            &mut prefix
+        } else if col < end_col {
+            &mut middle
+        } else {
+            &mut suffix
+        };
+        target.push(ch);
+        idx += ch_len;
+        col = col.saturating_add(ch_width);
+    }
+
+    (prefix, middle, suffix)
+}
+
+fn parse_ansi_escape_end(bytes: &[u8], start: usize) -> Option<usize> {
+    if bytes.get(start) != Some(&0x1b) {
+        return None;
+    }
+    if bytes.get(start + 1) != Some(&b'[') {
+        return Some((start + 1).min(bytes.len()));
+    }
+    let mut idx = start + 2;
+    while idx < bytes.len() {
+        let b = bytes[idx];
+        if (0x40..=0x7e).contains(&b) {
+            return Some(idx + 1);
+        }
+        idx += 1;
+    }
+    Some(bytes.len())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{BackgroundColor, RenderFrame, TerminalFlush, WriterFlush};
@@ -444,6 +537,7 @@ mod tests {
             cursor: Some((1, 1)),
             body_start_row: 1,
             background_color: BackgroundColor::DarkGray,
+            body_background_spans: vec![Some((0, 1))],
         };
         WriterFlush::new(&mut sink)
             .flush(&frame)
@@ -459,19 +553,19 @@ mod tests {
             lines: vec![
                 "header".to_string(),
                 "status".to_string(),
-                "body".to_string(),
+                "1234 body".to_string(),
             ],
             cursor: None,
             body_start_row: 2,
             background_color: BackgroundColor::DarkGray,
+            body_background_spans: vec![Some((5, 4))],
         };
         WriterFlush::new(&mut sink)
             .flush(&frame)
             .expect("flush should succeed");
         let rendered = String::from_utf8_lossy(&sink);
-        assert!(rendered.contains("\x1b[3;1H\x1b[48;5;235m\x1b[2Kbody\x1b[49m"));
-        assert!(!rendered.contains("\x1b[1;1H\x1b[48;5;235m"));
-        assert!(!rendered.contains("\x1b[2;1H\x1b[48;5;235m"));
+        assert!(rendered.contains("\x1b[3;1H\x1b[2K1234 \x1b[48;5;235mbody\x1b[49m\x1b[39m"));
+        assert!(!rendered.contains("\x1b[3;1H\x1b[2K\x1b[48;5;235m1234"));
     }
 
     #[test]
@@ -482,12 +576,13 @@ mod tests {
             cursor: None,
             body_start_row: 1,
             background_color: BackgroundColor::LightGray,
+            body_background_spans: vec![Some((0, 4))],
         };
         WriterFlush::new(&mut sink)
             .flush(&frame)
             .expect("flush should succeed");
         let rendered = String::from_utf8_lossy(&sink);
-        assert!(rendered.contains("\x1b[2;1H\x1b[48;5;248m\x1b[30m\x1b[2Kbody\x1b[49m\x1b[39m"));
+        assert!(rendered.contains("\x1b[2;1H\x1b[2K\x1b[48;5;248m\x1b[30mbody\x1b[49m\x1b[39m"));
     }
 
     #[test]
@@ -498,11 +593,12 @@ mod tests {
             cursor: None,
             body_start_row: 1,
             background_color: BackgroundColor::Blue,
+            body_background_spans: vec![Some((0, 4))],
         };
         WriterFlush::new(&mut sink)
             .flush(&frame)
             .expect("flush should succeed");
         let rendered = String::from_utf8_lossy(&sink);
-        assert!(rendered.contains("\x1b[2;1H\x1b[48;5;18m\x1b[97m\x1b[2Kbody\x1b[49m\x1b[39m"));
+        assert!(rendered.contains("\x1b[2;1H\x1b[2K\x1b[48;5;18m\x1b[97mbody\x1b[49m\x1b[39m"));
     }
 }
