@@ -376,6 +376,13 @@ impl AppState {
                 self.wrap_enabled = !self.wrap_enabled;
                 Ok(CommandDisposition::Continue)
             }
+            Command::ToggleCenterWrap => {
+                self.wrap_centered = !self.wrap_centered;
+                if self.wrap_centered {
+                    self.wrap_enabled = true;
+                }
+                Ok(CommandDisposition::Continue)
+            }
             Command::ToggleInvisibles => {
                 self.show_invisibles = !self.show_invisibles;
                 Ok(CommandDisposition::Continue)
@@ -1413,6 +1420,24 @@ mod tests {
         assert!(!app.is_wrap_enabled());
         app.execute_command(Command::ToggleWrap)
             .expect("toggle wrap should succeed");
+        assert!(app.is_wrap_enabled());
+    }
+
+    #[test]
+    fn toggle_center_wrap_enables_wrap_and_toggles_centering() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        assert!(!app.is_wrap_enabled());
+        assert!(!app.wrap_centered());
+
+        app.execute_command(Command::ToggleCenterWrap)
+            .expect("toggle center wrap should succeed");
+        assert!(app.is_wrap_enabled());
+        assert!(app.wrap_centered());
+
+        app.execute_command(Command::ToggleCenterWrap)
+            .expect("toggle center wrap should succeed");
+        assert!(!app.wrap_centered());
         assert!(app.is_wrap_enabled());
     }
 

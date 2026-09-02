@@ -58,6 +58,8 @@ fn maps_core_ctrl_shortcuts() {
         (KeyCode::Char('b'), Command::ToggleBom),
         (KeyCode::Char('t'), Command::CycleTabWidth),
         (KeyCode::Char('w'), Command::ToggleWrap),
+        (KeyCode::Char('e'), Command::ToggleCenterWrap),
+        (KeyCode::Char('p'), Command::ToggleCenterWrap),
         (KeyCode::Char('k'), Command::ToggleInvisibles),
         (KeyCode::Char('r'), Command::ToggleBackground),
         (KeyCode::Char('u'), Command::DeleteToLineStart),
@@ -94,6 +96,15 @@ fn maps_ctrl_shift_h_to_toggle_hard_tabs() {
         KeyModifiers::CONTROL | KeyModifiers::SHIFT,
     );
     assert_eq!(map_default(key), Some(Command::ToggleHardTabs));
+}
+
+#[test]
+fn maps_ctrl_shift_z_to_redo() {
+    let key = KeyEvent::new(
+        KeyCode::Char('z'),
+        KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+    );
+    assert_eq!(map_default(key), Some(Command::Redo));
 }
 
 #[test]
