@@ -137,7 +137,7 @@ impl<W: Write> TerminalFlush for WriterFlush<W> {
             let rendered = line.trim_end_matches(' ');
             let write = if row >= frame.body_start_row {
                 let (bg_sgr, fg_sgr) = match frame.background_color {
-                    BackgroundColor::DarkGray => ("\x1b[48;5;236m", ""),
+                    BackgroundColor::DarkGray => ("\x1b[48;5;235m", ""),
                     BackgroundColor::LightGray => ("\x1b[48;5;248m", "\x1b[30m"),
                     BackgroundColor::Blue => ("\x1b[48;5;18m", "\x1b[97m"),
                     BackgroundColor::Black => ("\x1b[40m\x1b[48;2;0;0;0m", ""),
@@ -469,9 +469,9 @@ mod tests {
             .flush(&frame)
             .expect("flush should succeed");
         let rendered = String::from_utf8_lossy(&sink);
-        assert!(rendered.contains("\x1b[3;1H\x1b[48;5;236m\x1b[2Kbody\x1b[49m"));
-        assert!(!rendered.contains("\x1b[1;1H\x1b[48;5;236m"));
-        assert!(!rendered.contains("\x1b[2;1H\x1b[48;5;236m"));
+        assert!(rendered.contains("\x1b[3;1H\x1b[48;5;235m\x1b[2Kbody\x1b[49m"));
+        assert!(!rendered.contains("\x1b[1;1H\x1b[48;5;235m"));
+        assert!(!rendered.contains("\x1b[2;1H\x1b[48;5;235m"));
     }
 
     #[test]
