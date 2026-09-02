@@ -35,6 +35,7 @@ pub enum Command {
     ToggleBom,
     ToggleWrap,
     ToggleCenterWrap,
+    ToggleTextColor,
     ToggleInvisibles,
     ToggleBackground,
     ToggleSelectionMode,

@@ -16,6 +16,14 @@ pub enum BackgroundColor {
     Black,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TextColorMode {
+    #[default]
+    Default,
+    Green,
+    Amber,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum RenderMode<'a> {
     Text {
@@ -99,6 +107,7 @@ pub struct RenderFrame {
     pub cursor: Option<(u16, u16)>,
     pub body_start_row: usize,
     pub background_color: BackgroundColor,
+    pub text_color: TextColorMode,
     pub body_background_spans: Vec<Option<(usize, usize)>>,
 }
 
@@ -114,6 +123,7 @@ pub struct RenderRequest<'a> {
     pub status: StatusLine,
     pub header_message: Option<&'a str>,
     pub background_color: BackgroundColor,
+    pub text_color: TextColorMode,
 }
 
 pub trait TerminalFlush {
@@ -148,10 +158,10 @@ impl<W: Write> TerminalFlush for WriterFlush<W> {
             };
             let write = if row >= frame.body_start_row {
                 let (bg_sgr, fg_sgr) = match frame.background_color {
-                    BackgroundColor::DarkGray => ("\x1b[48;5;235m", ""),
+                    BackgroundColor::DarkGray => ("\x1b[48;5;235m", text_color_sgr(frame)),
                     BackgroundColor::LightGray => ("\x1b[48;5;248m", "\x1b[30m"),
-                    BackgroundColor::Blue => ("\x1b[48;5;18m", "\x1b[97m"),
-                    BackgroundColor::Black => ("\x1b[40m\x1b[48;2;0;0;0m", ""),
+                    BackgroundColor::Blue => ("\x1b[48;5;18m", text_color_sgr(frame)),
+                    BackgroundColor::Black => ("\x1b[40m\x1b[48;2;0;0;0m", text_color_sgr(frame)),
                 };
                 if let Some((start_col, width)) = bg_span {
                     let (prefix, middle, suffix) =
@@ -265,6 +275,7 @@ impl Renderer {
                         .map(|(row, col)| ((row + chrome_rows) as u16, col as u16)),
                     body_start_row: chrome_rows,
                     background_color: request.background_color,
+                    text_color: request.text_color,
                     body_background_spans: text.background_spans,
                 }
             }
@@ -283,6 +294,7 @@ impl Renderer {
                     cursor: None,
                     body_start_row: chrome_rows,
                     background_color: request.background_color,
+                    text_color: request.text_color,
                     body_background_spans: vec![Some((0, body_width)); hex.lines.len()],
                 }
             }
@@ -369,6 +381,17 @@ impl Renderer {
             );
         }
         rendered
+    }
+}
+
+fn text_color_sgr(frame: &RenderFrame) -> &'static str {
+    match frame.text_color {
+        TextColorMode::Default => match frame.background_color {
+            BackgroundColor::Blue => "\x1b[97m",
+            _ => "",
+        },
+        TextColorMode::Green => "\x1b[38;5;82m",
+        TextColorMode::Amber => "\x1b[38;5;214m",
     }
 }
 
@@ -523,7 +546,7 @@ fn parse_ansi_escape_end(bytes: &[u8], start: usize) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::{BackgroundColor, RenderFrame, TerminalFlush, WriterFlush};
+    use super::{BackgroundColor, RenderFrame, TerminalFlush, TextColorMode, WriterFlush};
 
     #[test]
     fn writer_flush_does_not_emit_joined_newlines() {
@@ -533,6 +556,7 @@ mod tests {
             cursor: Some((1, 1)),
             body_start_row: 1,
             background_color: BackgroundColor::DarkGray,
+            text_color: TextColorMode::Default,
             body_background_spans: vec![Some((0, 1))],
         };
         WriterFlush::new(&mut sink)
@@ -554,6 +578,7 @@ mod tests {
             cursor: None,
             body_start_row: 2,
             background_color: BackgroundColor::DarkGray,
+            text_color: TextColorMode::Default,
             body_background_spans: vec![Some((5, 4))],
         };
         WriterFlush::new(&mut sink)
@@ -572,6 +597,7 @@ mod tests {
             cursor: None,
             body_start_row: 1,
             background_color: BackgroundColor::LightGray,
+            text_color: TextColorMode::Green,
             body_background_spans: vec![Some((0, 4))],
         };
         WriterFlush::new(&mut sink)
@@ -589,6 +615,7 @@ mod tests {
             cursor: None,
             body_start_row: 1,
             background_color: BackgroundColor::Blue,
+            text_color: TextColorMode::Default,
             body_background_spans: vec![Some((0, 4))],
         };
         WriterFlush::new(&mut sink)

@@ -60,6 +60,7 @@ fn maps_core_ctrl_shortcuts() {
         (KeyCode::Char('w'), Command::ToggleWrap),
         (KeyCode::Char('e'), Command::ToggleCenterWrap),
         (KeyCode::Char('p'), Command::ToggleCenterWrap),
+        (KeyCode::Char('n'), Command::ToggleTextColor),
         (KeyCode::Char('k'), Command::ToggleInvisibles),
         (KeyCode::Char('r'), Command::ToggleBackground),
         (KeyCode::Char('u'), Command::DeleteToLineStart),

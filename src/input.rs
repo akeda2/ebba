@@ -374,6 +374,7 @@ fn map_ctrl_shortcut(
         't' => Some(Command::CycleTabWidth),
         'w' => Some(Command::ToggleWrap),
         'e' => Some(Command::ToggleCenterWrap),
+        'n' => Some(Command::ToggleTextColor),
         '.' => Some(Command::ToggleInvisibles),
         'k' => Some(Command::ToggleInvisibles),
         'c' => Some(Command::Copy),
