@@ -1400,6 +1400,7 @@ mod tests {
             cursor: Some((1, 4)),
             body_start_row: 1,
             background_color: BackgroundColor::DarkGray,
+            body_background_spans: vec![Some((0, 4))],
         };
         let output = format_render_once_output(&frame);
         assert!(output.contains("# cursor: 2,5"));

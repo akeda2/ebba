@@ -35,6 +35,7 @@ pub struct TextRenderOutput {
     pub status_total_lines: usize,
     pub wrapped_segment: Option<(usize, usize)>,
     pub selection_spans: Vec<Option<SelectionSpan>>,
+    pub background_spans: Vec<Option<(usize, usize)>>,
 }
 
 #[derive(Debug, Default)]
@@ -90,6 +91,7 @@ fn render_unwrapped(document: &Document, viewport: TextViewport) -> TextRenderOu
 
     let mut lines = Vec::with_capacity(viewport.height);
     let mut selection_spans = Vec::with_capacity(viewport.height);
+    let mut background_spans = Vec::with_capacity(viewport.height);
     let mut cursor = None;
 
     for row in 0..viewport.height {
@@ -101,6 +103,7 @@ fn render_unwrapped(document: &Document, viewport: TextViewport) -> TextRenderOu
             );
             lines.push(filler);
             selection_spans.push(None);
+            background_spans.push(None);
             continue;
         }
 
@@ -128,6 +131,7 @@ fn render_unwrapped(document: &Document, viewport: TextViewport) -> TextRenderOu
             gutter_width = gutter_width
         );
         lines.push(rendered);
+        background_spans.push((text_width > 0).then_some((gutter_width + 1, text_width)));
 
         if line_index == cursor_line {
             let max_cursor_col = text_width.saturating_sub(1);
@@ -153,6 +157,7 @@ fn render_unwrapped(document: &Document, viewport: TextViewport) -> TextRenderOu
         status_total_lines: total_lines,
         wrapped_segment: None,
         selection_spans,
+        background_spans,
     }
 }
 
@@ -257,6 +262,7 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
 
     let mut lines = Vec::with_capacity(viewport.height);
     let mut selection_spans = Vec::with_capacity(viewport.height);
+    let mut background_spans = Vec::with_capacity(viewport.height);
     let mut cursor = None;
 
     for row in 0..viewport.height {
@@ -268,6 +274,7 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
             );
             lines.push(filler);
             selection_spans.push(None);
+            background_spans.push(None);
             continue;
         }
 
@@ -283,6 +290,9 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
         };
         lines.push(format!("{gutter} {left_padding}{text}"));
         selection_spans.push(None);
+        let background_start = gutter_width + 1 + center_padding;
+        let background_width = text_width.min(viewport.width.saturating_sub(background_start));
+        background_spans.push((background_width > 0).then_some((background_start, background_width)));
 
         if visual_row == cursor_visual_row {
             cursor = Some((row, cursor_col));
@@ -304,6 +314,7 @@ fn render_wrapped(document: &Document, viewport: TextViewport) -> TextRenderOutp
             None
         },
         selection_spans,
+        background_spans,
     }
 }
 
