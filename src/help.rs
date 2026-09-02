@@ -113,7 +113,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 item("Force quit", "Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12", 1),
                 item(
                     "Clipboard",
-                    "⌘C/X/V, Ctrl+C/X/V, Ctrl+Shift+C/V (line fallback on caret, repeat with double-press)",
+                    "⌘C/X/V, Ctrl+C/X/V, Ctrl+Shift+C/V",
                     2,
                 ),
                 item("Select", "⌘A, Shift+Arrows/PgUp/PgDn, Shift+⌥←→/⌘←→/⌘↑↓", 2),
@@ -145,7 +145,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 ),
                 item(
                     "Clipboard",
-                    "Ctrl+C/X/V, Ctrl+Shift+C/V (terminal, line fallback on caret, repeat with double-press)",
+                    "Ctrl+C/X/V, Ctrl+Shift+C/V",
                     2,
                 ),
                 item("Select", "Ctrl+A, Shift+Arrows/PgUp/PgDn", 2),
@@ -173,7 +173,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 item("Force quit", "Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12", 1),
                 item(
                     "Clipboard",
-                    "Ctrl+C/X/V/Ctrl+A (line fallback on caret, repeat with double-press)",
+                    "Ctrl+C/X/V/Ctrl+A",
                     2,
                 ),
                 item("Select", "Ctrl+A, Shift+Arrows/PgUp/PgDn", 2),
@@ -201,7 +201,7 @@ fn help_items(profile: KeybindingProfile, mode: HelpMode) -> Vec<HelpItem> {
                 item("Force quit", "Ctrl+Alt+Q/Ctrl+Shift+Q/Ctrl+G/F12", 1),
                 item(
                     "Clipboard",
-                    "Ctrl+C/X/V, Ctrl+Shift+C/V (line fallback on caret, repeat with double-press)",
+                    "Ctrl+C/X/V, Ctrl+Shift+C/V",
                     2,
                 ),
                 item("Select", "Ctrl+A, Shift+Arrows/PgUp/PgDn", 2),
