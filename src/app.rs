@@ -18,7 +18,7 @@ use crate::{
     ui::{
         renderer::{
             BackgroundColor, RenderFrame, RenderMode, RenderRequest, RenderState, Renderer,
-            TerminalFlush, WriterFlush,
+            TerminalFlush, TextColorMode, WriterFlush,
         },
         status::StatusLine,
     },
@@ -132,6 +132,7 @@ pub struct AppState {
     wrap_centered: bool,
     show_invisibles: bool,
     background_color: BackgroundColor,
+    text_color: TextColorMode,
     selection_mode: bool,
     keybinding_profile: KeybindingProfile,
     clipboard_guards: ClipboardGuards,
@@ -162,6 +163,7 @@ impl AppState {
             wrap_centered: false,
             show_invisibles: false,
             background_color: BackgroundColor::DarkGray,
+            text_color: TextColorMode::Default,
             selection_mode: false,
             keybinding_profile: KeybindingProfile::current(),
             clipboard_guards: ClipboardGuards::default(),
@@ -270,6 +272,10 @@ impl AppState {
 
     pub fn set_background_color(&mut self, background_color: BackgroundColor) {
         self.background_color = background_color;
+    }
+
+    pub fn text_color(&self) -> TextColorMode {
+        self.text_color
     }
 
     pub fn selection_mode_enabled(&self) -> bool {
@@ -381,6 +387,14 @@ impl AppState {
                 if self.wrap_centered {
                     self.wrap_enabled = true;
                 }
+                Ok(CommandDisposition::Continue)
+            }
+            Command::ToggleTextColor => {
+                self.text_color = match self.text_color {
+                    TextColorMode::Default => TextColorMode::Green,
+                    TextColorMode::Green => TextColorMode::Amber,
+                    TextColorMode::Amber => TextColorMode::Default,
+                };
                 Ok(CommandDisposition::Continue)
             }
             Command::ToggleInvisibles => {
@@ -739,6 +753,7 @@ fn render_frame_for_state(
                 status,
                 header_message,
                 background_color: app_state.background_color(),
+                text_color: app_state.text_color(),
             },
         ))
     } else {
@@ -756,6 +771,7 @@ fn render_frame_for_state(
                 status,
                 header_message,
                 background_color: app_state.background_color(),
+                text_color: app_state.text_color(),
             },
         ))
     }
@@ -1290,7 +1306,7 @@ mod tests {
     use crate::document::format::{LineEndingMode, analyze_line_endings};
     use crate::document::save::{SaveEncoding, SaveOverrides};
 
-    use crate::ui::renderer::{BackgroundColor, RenderState};
+    use crate::ui::renderer::{BackgroundColor, RenderState, TextColorMode};
 
     use super::{
         AppState, CommandDisposition, apply_hex_scroll, format_render_once_output,
@@ -1407,6 +1423,7 @@ mod tests {
             cursor: Some((1, 4)),
             body_start_row: 1,
             background_color: BackgroundColor::DarkGray,
+            text_color: TextColorMode::Default,
             body_background_spans: vec![Some((0, 4))],
         };
         let output = format_render_once_output(&frame);
@@ -1449,6 +1466,22 @@ mod tests {
         app.execute_command(Command::ToggleInvisibles)
             .expect("toggle invisibles should succeed");
         assert!(app.show_invisibles());
+    }
+
+    #[test]
+    fn toggle_text_color_cycles_all_modes() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        assert_eq!(app.text_color(), TextColorMode::Default);
+        app.execute_command(Command::ToggleTextColor)
+            .expect("toggle text color should succeed");
+        assert_eq!(app.text_color(), TextColorMode::Green);
+        app.execute_command(Command::ToggleTextColor)
+            .expect("toggle text color should succeed");
+        assert_eq!(app.text_color(), TextColorMode::Amber);
+        app.execute_command(Command::ToggleTextColor)
+            .expect("toggle text color should succeed");
+        assert_eq!(app.text_color(), TextColorMode::Default);
     }
 
     #[test]
