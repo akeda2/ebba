@@ -26,18 +26,25 @@ use crate::{
 
 const STARTUP_CONFIRMATION_THRESHOLD_BYTES: usize = 64 * 1024 * 1024;
 const MAX_AUTO_WRAP_COLUMN: usize = 140;
+const EMPTY_FILE_WRAP_COLUMN: usize = 120;
 
 /// Computes the default wrap column used when `--wrap`/`--center` is given
 /// without an explicit column: the longest line's display width, capped at
 /// `MAX_AUTO_WRAP_COLUMN` so pathologically long lines don't blow out the
-/// wrap width.
-fn auto_wrap_column(bytes: &[u8]) -> usize {
-    wrap_line_ranges(bytes)
+/// wrap width. Returns `None` when the document has no non-empty lines (e.g.
+/// a brand-new empty file), so callers can fall back to a screen-width-based
+/// default instead of an unusably narrow width.
+fn longest_line_width(bytes: &[u8]) -> Option<usize> {
+    let width = wrap_line_ranges(bytes)
         .into_iter()
         .map(|range| line_display_width(range, bytes))
         .max()
-        .unwrap_or(0)
-        .clamp(1, MAX_AUTO_WRAP_COLUMN)
+        .unwrap_or(0);
+    if width == 0 {
+        None
+    } else {
+        Some(width.min(MAX_AUTO_WRAP_COLUMN))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -143,7 +150,7 @@ pub struct AppState {
     wrap_enabled: bool,
     wrap_column: Option<usize>,
     wrap_centered: bool,
-    auto_wrap_column: usize,
+    auto_wrap_column: Option<usize>,
     show_invisibles: bool,
     background_color: BackgroundColor,
     text_color: TextColorMode,
@@ -162,8 +169,8 @@ impl AppState {
         let current_save_encoding = save_overrides.encoding.unwrap_or(detected_encoding);
         let auto_wrap_column = document
             .bytes()
-            .map(|bytes| auto_wrap_column(&bytes))
-            .unwrap_or(MAX_AUTO_WRAP_COLUMN);
+            .ok()
+            .and_then(|bytes| longest_line_width(&bytes));
         Self {
             document,
             save_overrides,
@@ -248,13 +255,21 @@ impl AppState {
         self.wrap_centered
     }
 
+    /// Resolves the auto-detected wrap column, falling back to the current
+    /// screen width (capped at `EMPTY_FILE_WRAP_COLUMN`) when the document
+    /// has no non-empty lines yet (e.g. a brand-new empty file).
+    fn resolved_auto_wrap_column(&self) -> usize {
+        self.auto_wrap_column
+            .unwrap_or_else(|| self.viewport_columns.clamp(1, EMPTY_FILE_WRAP_COLUMN))
+    }
+
     fn effective_wrap_column(&self) -> Option<usize> {
         if !self.wrap_enabled {
             return None;
         }
         match (self.wrap_column, self.wrap_centered) {
             (Some(column), _) => Some(column),
-            (None, true) => Some(self.auto_wrap_column),
+            (None, true) => Some(self.resolved_auto_wrap_column()),
             (None, false) => None,
         }
     }
@@ -264,7 +279,10 @@ impl AppState {
             return None;
         }
         if self.wrap_centered {
-            return Some(self.wrap_column.unwrap_or(self.auto_wrap_column));
+            return Some(
+                self.wrap_column
+                    .unwrap_or_else(|| self.resolved_auto_wrap_column()),
+            );
         }
         Some(self.wrap_column.unwrap_or(0))
     }
@@ -929,6 +947,7 @@ pub fn run() -> AppResult<()> {
     }
     if args.render_once {
         let mut render_state = RenderState::new(args.render_width, args.render_height);
+        app_state.set_viewport_columns(args.render_width as usize);
         let header_message = if args.render_help {
             Some(help::startup_help_text(
                 keybinding_profile,
@@ -964,6 +983,7 @@ pub fn run() -> AppResult<()> {
         ..EventLoop::default()
     };
     let mut render_state = RenderState::new(terminal.width, terminal.height);
+    app_state.set_viewport_columns(terminal.width as usize);
     let mut flusher = WriterFlush::new(stdout());
     let mut show_startup_help = true;
     let mut startup_help_detail = HelpDetail::Compact;
@@ -1328,8 +1348,8 @@ mod tests {
     use crate::ui::renderer::{BackgroundColor, RenderState, TextColorMode};
 
     use super::{
-        AppState, CommandDisposition, MAX_AUTO_WRAP_COLUMN, apply_hex_scroll,
-        format_render_once_output, render_frame_for_state,
+        AppState, CommandDisposition, EMPTY_FILE_WRAP_COLUMN, MAX_AUTO_WRAP_COLUMN,
+        apply_hex_scroll, format_render_once_output, render_frame_for_state,
     };
 
     fn fixture_path(name: &str) -> PathBuf {
@@ -2003,6 +2023,28 @@ mod tests {
             app.document().selection().active.byte_offset,
             MAX_AUTO_WRAP_COLUMN
         );
+    }
+
+    #[test]
+    fn centered_wrap_without_column_falls_back_to_screen_width_for_empty_file() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        app.set_wrap_centered(true);
+        app.set_wrap_enabled(true);
+        app.set_wrap_column(None);
+        app.set_viewport_columns(90);
+        assert_eq!(app.status_wrap_column(), Some(90));
+    }
+
+    #[test]
+    fn centered_wrap_without_column_caps_empty_file_fallback_at_120() {
+        let document = Document::from_bytes(Vec::new());
+        let mut app = AppState::new(document);
+        app.set_wrap_centered(true);
+        app.set_wrap_enabled(true);
+        app.set_wrap_column(None);
+        app.set_viewport_columns(300);
+        assert_eq!(app.status_wrap_column(), Some(EMPTY_FILE_WRAP_COLUMN));
     }
 
     #[test]
