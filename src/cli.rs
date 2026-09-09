@@ -80,7 +80,7 @@ pub struct Cli {
     #[arg(
         short = 'c',
         long,
-        help = "Center wrapped text after the gutter and enable wrap (uses 80 columns when --wrap has no number)"
+        help = "Center wrapped text after the gutter and enable wrap (uses the longest line's width, capped at 140, when --wrap has no number)"
     )]
     pub center: bool,
     #[arg(
