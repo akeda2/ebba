@@ -2,17 +2,29 @@
 
 `ebba` is a minimal terminal editor.
 
-Written in rust, Ebba is inspired by **fresh**, but is a minimal implementation that keeps the same navigation and clipboard-style shortcuts.
+Ebba is inspired by all the things i like about all sorts of different editors: **fresh**, **ne**, **nano**, **edit**, **eb**, **notepad** etc. It is a minimal implementation of a terminal style editor with modern navigation and clipboard-style shortcuts.
 
 ## Features
-- Modern style clipboarding: `ctrl+c/v/x/a`
+### Modern style clipboarding 
+- Line select mode: `ctrl+c/v/x/a` without selecting copies the whole line.
+- Standard select: `shift+arrows`, `ctrl+c/v/x/a etc.
+- `Select-mode` - `F3/Ctrl+space/Alt+s`, toggles on/off, `arrows` select, `ctrl+c/v/x` works as usual.
 - Terminal copy/paste: `ctrl+shift+c/v`
+
+### Navigation and design choices
 - Arrow key/pgup/pgdn/home/end navigation.
+- Line-wrap, with up/down-navigation.
 - Mandatory line numbering.
 - Multi-line tab indentation.
 - Multiple keybindings for exiting.
 - Hotkey for showing invisible characters and line endings.
 - Read only hex mode fallback for binary files.
+- Cut/copy-guard. Repeated cut/copy requires extra keypress.
+- No dialogs. Will not exit (except force-quit) with unsaved changes.
+
+### Few colour choices
+- Background: Dark gray/Light gray (inverted)/Black/Blue.
+- Text: Default/Green/Amber
 
 ## Installation
 
