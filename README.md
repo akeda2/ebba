@@ -84,8 +84,8 @@ ebba README.md -w 80 -c -i
 - `-l, --line-ending <lf|cr|crlf>`  Force line endings on save (otherwise preserve mode).
 - `-t, --text`  Force text startup mode.
 - `-b, --binary`  Force binary fallback mode (read-only hex view).
-- `-w, --wrap [COLUMN]`  Enable wrapping; optional fixed wrap column (for example `--wrap 80`).
-- `-c, --center`  Center wrapped text after the gutter and enable wrapping. With bare `--center` (or `--wrap --center`), ebba uses 80 columns (clamped to the terminal width after the gutter).
+- `-w, --wrap [COLUMN]`  Enable wrapping; optional fixed wrap column (for example `--wrap 80`). Without `COLUMN`, wrap uses the available text width in the viewport.
+- `-c, --center`  Center wrapped text after the gutter and enable wrapping. With bare `--center` (or `--wrap --center`), ebba auto-selects a wrap width from the longest line (capped at 140). For empty files it falls back to viewport width (capped at 120), and the final width is clamped to the available viewport text width.
 - `-i, --invisibles`  Show invisible characters (space `·`, LF `␊`, CR `␍`, CRLF `␍␊`).
 - `-C, --config <PATH>`  Load YAML config from explicit path.
 - `-k, --keymap <auto|mac|linux|linux-console|windows>`  Force keybinding profile at startup (useful for cross-platform keymap testing).
