@@ -11,29 +11,38 @@ Ebba is inspired by all the things i like about all sorts of different editors: 
 - `Select-mode` - `F3/Ctrl+space/Alt+s`, toggles on/off, `arrows` select, `ctrl+c/v/x` works as usual.
 - Terminal copy/paste: `ctrl+shift+c/v`
 
-### Navigation and design choices
+### Navigation
 - Arrow key/pgup/pgdn/home/end navigation.
+
+### Design choices
 - Line-wrap, with up/down-navigation.
 - Mandatory line numbering.
-- Multi-line tab indentation.
+- Multiple keybindings for each function for compatibility.
+- Multi-line tab indentation: `select` then `tab`.
 - Multiple keybindings for exiting.
 - Hotkey for showing invisible characters and line endings.
 - Read only hex mode fallback for binary files.
 - Cut/copy-guard. Repeated cut/copy requires extra keypress.
 - No dialogs. Will not exit (except force-quit) with unsaved changes.
+- Condensed help always visible on startup, `ctrl+h/F1` for full.
 
 ### Few colour choices
-- Background: Dark gray/Light gray (inverted)/Black/Blue.
-- Text: Default/Green/Amber
+- Background: Dark gray/Light gray(inverted)/Black/Blue.
+- Text: Default/Green/Amber (Light gray background is black text only).
 
 ## Installation
 
+## Easy: Build with project script
+
+```bash
+./inst.sh
+```
+## Cargo
 ### 1) Build a release binary
 
 ```bash
 cargo build --release
 ```
-
 Binary path:
 
 ```text
@@ -46,20 +55,13 @@ target/release/ebba
 cargo install --path .
 ```
 
-### 3) Install via project script
-
-```bash
-./inst.sh
-```
-
-`inst.sh` currently runs `cargo install --path .`, sudo-copies `target/release/ebba` to `/usr/local/bin/ebba` for all users, and does optional `gb` integration if available.
+`inst.sh` currently runs `cargo install --path .` for user install, then sudo-copies `target/release/ebba` to `/usr/local/bin/ebba` for all users (mostly for sudo), and does optional `gb` integration if available.
 
 ### 4) Install on Windows via PowerShell
 
 ```powershell
 .\inst.ps1
 ```
-
 `inst.ps1` installs with `cargo install --path .` and ensures the user Cargo bin directory is present in the user PATH.
 
 ## Usage
